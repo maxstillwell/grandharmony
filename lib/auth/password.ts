@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
 const keyLength = 64;
-const minimumLength = 15;
+const minimumLength = 8;
 
 export function validatePassword(password: string) {
   if (password.length < minimumLength) throw new Error(`Use a password with at least ${minimumLength} characters.`);
