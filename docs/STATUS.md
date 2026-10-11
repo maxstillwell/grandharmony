@@ -1,8 +1,8 @@
 # Status
 
-## Phase 2 — ready for production deployment
+## Phase 2 — deployed; first administrator initialization pending
 
-Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. Neon is connected, the migration has been verified, and the required protected administrator variables exist in the Production environment.
+Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. Neon is connected, the migration has been verified, the required protected administrator variables exist in Production, and the authenticated Portal has been deployed.
 
 ### Completed in the working tree
 
@@ -18,7 +18,8 @@ Phase 2 source implementation adds a fail-closed authentication, database and RB
 - TypeScript validation passed
 - Production build passed with protected Portal, login, admin, Auth.js and project workspace routes.
 - Database migration generation passed. The migration was applied from the authorised local Vercel environment and verified in Neon: `users`, `roles`, `projects`, `project_memberships`, `model_registry`, `model_versions` and `audit_logs` exist.
-- Production deployment is the next step; online authentication and access checks remain required after the cloud build.
+- Production deployment succeeded from commit `49adf3fbffcc4cfe3fd655430c272d06eee39368`: https://grandharmony.vercel.app
+- Online smoke checks passed: `/`, `/login`, `/admin/initialize` and `/demo/portal` return 200; unauthenticated `/portal` is redirected server-side to `/login`.
 
 ### Known test environment limitation
 
@@ -28,4 +29,4 @@ The managed build environment does not permit binding a local port (`next dev` f
 
 - Neon is connected to the Vercel project on its Free plan. It injects encrypted `GH_DATABASE_URL`/`GH_*` integration variables into Development, Preview and Production; the application now supports that connection name without copying a secret.
 - `AUTH_SECRET`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_TOKEN` are configured only in Vercel Production; no Google Cloud or OAuth Client is required.
-- Production still serves the previously working Phase 1.5 release until the pending cloud deployment has completed and passed online checks.
+- The initial Super Admin has not yet set a password. Complete the one-time protected setup at `/admin/initialize`, then verify a successful login and use `/admin` to create the optional second Super Admin.
