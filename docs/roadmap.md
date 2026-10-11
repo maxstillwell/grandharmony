@@ -13,12 +13,12 @@
 - 700 Project dashboard demo, workspace navigation, project selector, model library, activity feed, quick access and compact placeholder registers
 - Future Neon PostgreSQL, Auth.js, RBAC, model, CRM and environment-isolation architecture documented
 
-## Phase 2 — implementation awaiting protected setup
+## Phase 2 — ready for production deployment
 
 - Drizzle schema, repeatable migrations, fail-closed Auth.js credentials login, server-side RBAC guards, protected password bootstrap and admin access-management interface are implemented in source.
 - Neon Marketplace is connected on the Free plan and supplies encrypted `GH_DATABASE_URL` variables to Vercel.
 - Public registration and third-party social login are intentionally excluded. The first Super Admin must be created through the one-time protected bootstrap; an existing Super Admin can create the optional second administrator.
-- Do not deploy the authenticated portal until the Neon migration and protected bootstrap variables are configured and security-tested.
+- Neon migration and protected bootstrap variables are configured. Deploy only after the cloud build, then complete online authentication and access-control checks.
 
 ## Later Phase 2 work — deferred
 
