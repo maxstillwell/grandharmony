@@ -46,3 +46,11 @@ The public website reads only a curated publication surface: approved project su
 ### Environment isolation and secrets
 
 Use separate Neon branches/databases and separate Auth.js credentials for development, preview and production. Preview deployments use non-production demo or masked data and never share production write credentials. Store `DATABASE_URL`, direct migration URL, `AUTH_SECRET`, OAuth client secrets, storage keys and integration secrets in Vercel environment variables, scoped by environment. Never commit `.env` files, expose secret values to the client, or place secrets in model bundles. Rotate secrets on provider/personnel changes and record a production owner for every secret.
+
+## Phase 2 implementation status
+
+The repository now contains a Drizzle schema and migration for `users`, `roles`, `user_roles`, `projects`, `project_memberships`, `model_registry`, `model_versions`, `audit_logs`, plus the Auth.js account/session/verification-token tables. IDs are UUIDs and operational tables include creation/update timestamps. The migration seeds only the approved role vocabulary and the existing public 700 Project reference; it does not import people, financials, inventory, CRM data or documents.
+
+Auth.js is configured for Google OAuth with JWT sessions. Login is fail-closed: a Google identity must match an active database user with a role and explicit project membership. An exception exists only for the one-time bootstrap identity supplied through Vercel environment variables, which can visit the protected initializer and create the first Super Admin. The initializer requires both the approved bootstrap email and a separate bootstrap token, records an audit event, assigns management access to active projects, and refuses once a Super Admin already exists.
+
+Required Vercel environment variables are documented in `.env.example`: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_TOKEN`. Configure them in Vercel only, separately for Production and Preview. Run `npm run db:migrate` only with the intended environment's database URL.

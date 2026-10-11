@@ -1,27 +1,24 @@
 # Status
 
-## Phase 1.5 — complete
+## Phase 2 — implementation blocked on Neon and Google OAuth configuration
 
-This phase upgrades the production-quality corporate website and extends the safe Portal Demo without adding a database, authentication, CRM, private data or executable models.
+Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. It is not deployed because the required Neon database and Google OAuth configuration have not been authorised/configured.
 
-### Completed
+### Completed in the working tree
 
-- Corporate website quality pass: responsive layout review, focus-visible navigation treatment, semantic metadata, Open Graph metadata, robots policy, sitemap and SVG favicon.
-- Contact remains deliberately inactive and does not expose an unconfirmed email address.
-- Portal Demo includes 700 Project workspace navigation, project selector, project overview, models and tools registry, recent demonstration activity, quick access and compact financial/planning placeholders.
-- Every dashboard value is labelled as demo, placeholder or not integrated; there is no claim of live financial, inventory, CRM or model data.
-- Future Neon/Auth.js/RBAC, project permissions, model integration, CRM publication and environment-isolation design is documented in `docs/architecture.md`.
+- Drizzle ORM schema and generated migration for users, roles, project memberships, model registry/versioning and audit logs, including Auth.js tables.
+- Auth.js Google OAuth route with a fail-closed sign-in callback; missing database/OAuth configuration grants no access.
+- Server-side Portal and Super Admin guards, one-time protected administrator bootstrap, role/project assignment actions and audit logging.
+- Authenticated project workspace and model registry routes; existing `/demo/portal` remains untouched as an explicit demonstration.
+- `.env.example`, migration scripts and Phase 2 architecture/roadmap documentation.
 
 ### Verification
 
 - ESLint passed
 - TypeScript validation passed
-- Production build passed
-- Build generated `/`, `/portal`, `/demo/portal`, project detail, favicon, robots and sitemap routes successfully
-- Source implementation commit: `813142e` (`feat: complete phase 1.5 quality and portal demo`)
-- Release documentation commit: `116acc6` (`docs: record phase 1.5 verification plan`)
-- Vercel production deployment: `https://grandharmony.vercel.app` — READY
-- Production smoke test passed: `/`, `/projects/700-project`, `/portal`, `/demo/portal`, `/robots.txt`, `/sitemap.xml` and `/icon.svg` returned HTTP 200.
+- Production build passed with protected Portal, login, admin, Auth.js and project workspace routes.
+- Database migration generation passed; migration was not run because no database is configured.
+- Production deployment intentionally deferred pending external configuration and authentication security checks.
 
 ### Known test environment limitation
 
@@ -29,7 +26,7 @@ The managed build environment does not permit binding a local port (`next dev` f
 
 ## Known limits
 
-- Placeholder Unsplash imagery must be replaced with approved licensed media before a final public launch.
-- Official contact details and a secure enquiry provider are not configured.
-- `/portal` contains no authentication or private data; `/demo/portal` is illustrative only.
-- Neon, Auth.js, project permissions, models, documents, inventory and CRM remain design-only future work.
+- No Neon integration, `DATABASE_URL` or other project environment variables exist on Vercel yet.
+- Neon Free Plan/region setup requires user completion because the available plan identifier and Marketplace account authorisation could not be safely determined by the CLI.
+- Google OAuth Client ID/Secret, redirect URI and protected bootstrap values have not been supplied through Vercel Environment Variables.
+- Current Production remains on the previously working Phase 1.5 release; it has not been changed by this Phase 2 code.
