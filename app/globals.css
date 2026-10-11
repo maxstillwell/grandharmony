@@ -2,14 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --ink: #121316; --paper: #f8f8f6; --line: #ebe8e1; }
+:root { --ink: #1a1b1e; --paper: #f7f6f3; --line: #e2e0d9; --muted: #7a7c80; --eucalyptus: #5a6258; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
-::selection { background: #d8d5ce; }
+::selection { background: var(--eucalyptus); color: white; }
 @layer utilities {
-  .eyebrow { @apply text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6E6A5F]; }
-  .display { @apply font-medium tracking-[-0.055em]; }
-  .rule { @apply border-t border-[#EBE8E1]; }
+  .eyebrow { @apply text-[10px] font-medium uppercase tracking-[0.18em] text-[#5A6258]; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  .display { @apply font-light tracking-[-0.045em]; }
+  .rule { @apply border-t border-[#E2E0D9]; }
+  .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  .architectural-grid { background-size: 40px 40px; background-image: linear-gradient(to right, rgba(226, 224, 217, .7) 1px, transparent 1px), linear-gradient(to bottom, rgba(226, 224, 217, .7) 1px, transparent 1px); }
+  .link-underline { position: relative; }
+  .link-underline::after { content: ""; position: absolute; right: 0; bottom: -3px; left: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
+  .link-underline:hover::after, .link-underline:focus-visible::after { transform: scaleX(1); transform-origin: left; }
 }
