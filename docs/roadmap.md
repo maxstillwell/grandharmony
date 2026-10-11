@@ -1,15 +1,23 @@
 # Roadmap
 
-## Phase 1 — complete foundation
+## Phase 1 — foundation complete
 
-- Corporate website and project detail pattern
-- Responsive portal visual demo using only illustrative data
-- Base design system and documentation
+- Corporate website and public project detail pattern
+- Safe portal holding page and non-confidential UI demonstration
+- Architectural Capital visual system and baseline documentation
+
+## Phase 1.5 — complete
+
+- Corporate responsive-quality pass, semantic metadata, sitemap, robots policy and SVG favicon
+- Improved keyboard focus treatment and explicit inactive contact path
+- 700 Project dashboard demo, workspace navigation, project selector, model library, activity feed, quick access and compact placeholder registers
+- Future Neon PostgreSQL, Auth.js, RBAC, model, CRM and environment-isolation architecture documented
 
 ## Phase 2 — deferred
 
-- Auth.js authentication and server-side role-based access
-- Neon PostgreSQL schema and migrations
-- Project membership, controlled content publishing, model registry
-- Secure document handling, financial models, CRM and sales integrations
-- Contact submission service after a secure provider is selected
+- Approve identity provider and implement Auth.js authentication
+- Provision Neon PostgreSQL, schema migrations and server-side RBAC
+- Controlled public-content publishing workflow and model registry
+- Secure documents, real financial models, inventory, CRM and sales integrations
+- Contact submission service after a secure provider and official contact channel are approved
+- Replace temporary Unsplash images with approved licensed imagery

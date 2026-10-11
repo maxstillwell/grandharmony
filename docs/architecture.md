@@ -1,12 +1,48 @@
 # Architecture
 
-The application is a Next.js App Router project using TypeScript strict mode, Tailwind CSS and reusable React components. Public project records are isolated in `lib/data/projects.ts`; they represent approved public content and are intentionally separate from any future internal project system.
+## Current Phase 1.5 boundary
 
-The routes are:
+Grand Harmony uses Next.js App Router, TypeScript strict mode, Tailwind CSS and reusable React components. Public project records are isolated in `lib/data/projects.ts`; they are approved public content, not an internal source of truth.
 
 - `/` — corporate website
-- `/projects/[slug]` — reusable public project detail page
-- `/portal` — generic portal holding page, without authentication claims
-- `/demo/portal` — clearly labelled, non-confidential frontend demo
+- `/projects/[slug]` — public project detail pages
+- `/portal` — non-authenticated holding page
+- `/demo/portal` — non-confidential visual demonstration only
 
-No database, authentication provider, API, client-side credential, real financial model, or CRM implementation is present. Neon PostgreSQL and Auth.js remain future concerns. Future authorisation must be server-side and must not rely on hiding navigation.
+No database, authentication provider, API, real model, CRM, client-side credential or private document exists in this phase. Authorisation must never rely on hiding navigation.
+
+## Future platform design — not implemented
+
+### Neon PostgreSQL
+
+Use Neon PostgreSQL as the authoritative operational datastore through a server-only data access layer. Vercel request traffic uses a pooled `DATABASE_URL`; migrations use an optional direct connection. Use parameterised queries or a typed ORM, source-controlled migrations, encrypted transport, least-privilege roles, backups and audit-friendly timestamps. Browser code must never receive a connection string.
+
+Future entities include `users`, `roles`, `project_memberships`, `projects`, `project_publications`, `inventory`, `price_scenarios`, `model_registry`, `documents`, `crm_contacts`, `crm_activities` and append-only `audit_events`. The developer owner role retains final server-side authority over projects, inventory, prices, publication and CRM administration.
+
+### Auth.js and RBAC
+
+Introduce Auth.js only after selecting an approved identity provider and access policy. Sessions must be secure, httpOnly and server-validated. Keep roles and project membership in server-side checks; do not trust a client-supplied project ID, role claim or hidden UI state.
+
+- **Developer owner / administrator** — final authority for projects, inventory, prices, CRM, users and publication.
+- **Investment director** — portfolio, acquisition and approved financial/model access.
+- **Project manager** — assigned project workspace, planning, documents and controlled reporting.
+- **Sales / CRM manager** — assigned inventory, approved pricing and CRM workflows.
+- **External adviser** — explicit, time-bounded document or workspace access only.
+
+Every protected request requires a verified session and a project-level permission check. Price publication, inventory changes, role changes and exports must produce immutable audit events.
+
+### Project permissions
+
+Use a many-to-many `project_memberships` table with project roles or granular permissions. Access is deny-by-default and scoped to an explicit project. Public content is copied through an approved `project_publications` workflow rather than read from internal project records.
+
+### HTML models
+
+Register future HTML/JS models in `model_registry` with owner, project, category, version, integrity metadata, status and access policy. Serve each through an authenticated isolated route or sandbox/iframe with a strict content security policy. Inputs, scenarios and exports require server-side authorisation and audit logging; models must not receive broad database credentials.
+
+### Sales website and CRM
+
+The public website reads only a curated publication surface: approved project summary, availability labels and approved media. CRM and inventory systems remain private. Future synchronisation should use audited integration services with explicit field mapping, idempotency and approval states; public pages must never expose leads, unapproved prices or private inventory notes.
+
+### Environment isolation and secrets
+
+Use separate Neon branches/databases and separate Auth.js credentials for development, preview and production. Preview deployments use non-production demo or masked data and never share production write credentials. Store `DATABASE_URL`, direct migration URL, `AUTH_SECRET`, OAuth client secrets, storage keys and integration secrets in Vercel environment variables, scoped by environment. Never commit `.env` files, expose secret values to the client, or place secrets in model bundles. Rotate secrets on provider/personnel changes and record a production owner for every secret.
