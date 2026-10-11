@@ -5,7 +5,7 @@ export const modelStatus = pgEnum("model_status", ["not_integrated", "active", "
 
 const timestamps = { createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(), updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull() };
 
-export const users = pgTable("users", { id: uuid("id").defaultRandom().primaryKey(), email: text("email").notNull(), name: text("name"), image: text("image"), emailVerified: timestamp("email_verified", { withTimezone: true }), isActive: boolean("is_active").default(true).notNull(), ...timestamps }, (table) => [uniqueIndex("users_email_unique").on(table.email)]);
+export const users = pgTable("users", { id: uuid("id").defaultRandom().primaryKey(), email: text("email").notNull(), name: text("name"), image: text("image"), passwordHash: text("password_hash"), emailVerified: timestamp("email_verified", { withTimezone: true }), isActive: boolean("is_active").default(true).notNull(), ...timestamps }, (table) => [uniqueIndex("users_email_unique").on(table.email)]);
 export const roles = pgTable("roles", { id: uuid("id").defaultRandom().primaryKey(), name: appRole("name").notNull().unique(), description: text("description"), ...timestamps });
 export const userRoles = pgTable("user_roles", { userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), roleId: uuid("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }), ...timestamps }, (table) => [primaryKey({ columns: [table.userId, table.roleId] })]);
 

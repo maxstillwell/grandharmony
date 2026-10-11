@@ -15,6 +15,6 @@ export async function getPortalAccess(email: string): Promise<PortalAccess | nul
   return { userId: user.id, email: user.email, name: user.name, role: assignedRoles[0].name, projects: memberships };
 }
 
-export async function isBootstrapIdentity(email: string | null | undefined) {
-  return Boolean(process.env.BOOTSTRAP_ADMIN_EMAIL && process.env.BOOTSTRAP_ADMIN_TOKEN && email && email.toLowerCase() === process.env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+export function isBootstrapSetupConfigured() {
+  return Boolean(process.env.AUTH_SECRET && process.env.BOOTSTRAP_ADMIN_EMAIL && process.env.BOOTSTRAP_ADMIN_TOKEN);
 }

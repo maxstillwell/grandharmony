@@ -1,14 +1,14 @@
 # Status
 
-## Phase 2 — implementation awaiting migration and Google OAuth configuration
+## Phase 2 — implementation awaiting migration and protected administrator setup
 
-Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. Neon is now connected, but the migration and Google OAuth configuration still need completion before it can safely replace Production.
+Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. Neon is connected, but the migration and protected administrator setup still need completion before it can safely replace Production.
 
 ### Completed in the working tree
 
-- Drizzle ORM schema and generated migration for users, roles, project memberships, model registry/versioning and audit logs, including Auth.js tables.
-- Auth.js Google OAuth route with a fail-closed sign-in callback; missing database/OAuth configuration grants no access.
-- Server-side Portal and Super Admin guards, one-time protected administrator bootstrap, role/project assignment actions and audit logging.
+- Drizzle ORM schema and generated migrations for users, roles, project memberships, model registry/versioning and audit logs, including a password-hash field.
+- Auth.js credentials login with a fail-closed authorization check; no public registration or third-party social login exists.
+- Server-side Portal and Super Admin guards, one-time protected password bootstrap, optional second Super Admin creation, role/project assignment actions and audit logging.
 - Authenticated project workspace and model registry routes; existing `/demo/portal` remains untouched as an explicit demonstration.
 - `.env.example`, migration scripts and Phase 2 architecture/roadmap documentation.
 
@@ -28,5 +28,5 @@ The managed build environment does not permit binding a local port (`next dev` f
 
 - Neon is connected to the Vercel project on its Free plan. It injects encrypted `GH_DATABASE_URL`/`GH_*` integration variables into Development, Preview and Production; the application now supports that connection name without copying a secret.
 - A database migration must still be executed through an authorised Neon/Vercel workflow and then verified before release.
-- Google OAuth Client ID/Secret, redirect URI and protected bootstrap values have not been supplied through Vercel Environment Variables.
+- `AUTH_SECRET`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_TOKEN` have not been supplied through Vercel Environment Variables. No Google Cloud or OAuth Client is required.
 - Current Production remains on the previously working Phase 1.5 release; it has not been changed by this Phase 2 code.

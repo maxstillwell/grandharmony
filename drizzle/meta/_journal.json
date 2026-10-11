@@ -8,6 +8,13 @@
       "when": 1791751428597,
       "tag": "0000_rainy_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791760421992,
+      "tag": "0001_lucky_mysterio",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getPortalAccess, isBootstrapIdentity, type PortalAccess } from "@/lib/auth/access";
+import { getPortalAccess, type PortalAccess } from "@/lib/auth/access";
 
 export async function requirePortalAccess(): Promise<PortalAccess> {
   const session = await auth();
@@ -8,7 +8,6 @@ export async function requirePortalAccess(): Promise<PortalAccess> {
   if (!email) redirect("/login?reason=signin_required");
   const access = await getPortalAccess(email);
   if (access) return access;
-  if (await isBootstrapIdentity(email)) redirect("/admin/initialize");
   redirect("/login?reason=unauthorized");
 }
 
