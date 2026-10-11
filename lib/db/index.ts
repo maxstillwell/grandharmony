@@ -5,10 +5,18 @@ import * as schema from "./schema";
 type Database = ReturnType<typeof drizzle<typeof schema>>;
 let database: Database | undefined;
 
-export function isDatabaseConfigured() { return Boolean(process.env.DATABASE_URL); }
+function databaseUrl() {
+  // Neon’s Vercel Marketplace integration scopes this project’s connection
+  // string under GH_DATABASE_URL. DATABASE_URL remains supported for local
+  // development and deliberately configured environments.
+  return process.env.DATABASE_URL ?? process.env.GH_DATABASE_URL;
+}
+
+export function isDatabaseConfigured() { return Boolean(databaseUrl()); }
 
 export function getDb(): Database {
-  if (!process.env.DATABASE_URL) throw new Error("Database is not configured.");
-  if (!database) database = drizzle(neon(process.env.DATABASE_URL), { schema });
+  const url = databaseUrl();
+  if (!url) throw new Error("Database is not configured.");
+  if (!database) database = drizzle(neon(url), { schema });
   return database;
 }

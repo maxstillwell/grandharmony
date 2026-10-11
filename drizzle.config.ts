@@ -1,4 +1,11 @@
 import "dotenv/config";
 import type { Config } from "drizzle-kit";
 
-export default { schema: "./lib/db/schema.ts", out: "./drizzle", dialect: "postgresql", dbCredentials: { url: process.env.DATABASE_URL ?? "postgresql://localhost/grandharmony" } } satisfies Config;
+export default {
+  schema: "./lib/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL ?? process.env.GH_DATABASE_URL ?? "postgresql://localhost/grandharmony",
+  },
+} satisfies Config;

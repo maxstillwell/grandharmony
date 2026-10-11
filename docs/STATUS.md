@@ -1,8 +1,8 @@
 # Status
 
-## Phase 2 — implementation blocked on Neon and Google OAuth configuration
+## Phase 2 — implementation awaiting migration and Google OAuth configuration
 
-Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. It is not deployed because the required Neon database and Google OAuth configuration have not been authorised/configured.
+Phase 2 source implementation adds a fail-closed authentication, database and RBAC foundation. Neon is now connected, but the migration and Google OAuth configuration still need completion before it can safely replace Production.
 
 ### Completed in the working tree
 
@@ -17,7 +17,7 @@ Phase 2 source implementation adds a fail-closed authentication, database and RB
 - ESLint passed
 - TypeScript validation passed
 - Production build passed with protected Portal, login, admin, Auth.js and project workspace routes.
-- Database migration generation passed; migration was not run because no database is configured.
+- Database migration generation passed. The Neon connection is present only as an encrypted Vercel integration variable; the managed workspace cannot retrieve it for a direct migration command, so the migration has not yet been run.
 - Production deployment intentionally deferred pending external configuration and authentication security checks.
 
 ### Known test environment limitation
@@ -26,7 +26,7 @@ The managed build environment does not permit binding a local port (`next dev` f
 
 ## Known limits
 
-- No Neon integration, `DATABASE_URL` or other project environment variables exist on Vercel yet.
-- Neon Free Plan/region setup requires user completion because the available plan identifier and Marketplace account authorisation could not be safely determined by the CLI.
+- Neon is connected to the Vercel project on its Free plan. It injects encrypted `GH_DATABASE_URL`/`GH_*` integration variables into Development, Preview and Production; the application now supports that connection name without copying a secret.
+- A database migration must still be executed through an authorised Neon/Vercel workflow and then verified before release.
 - Google OAuth Client ID/Secret, redirect URI and protected bootstrap values have not been supplied through Vercel Environment Variables.
 - Current Production remains on the previously working Phase 1.5 release; it has not been changed by this Phase 2 code.
