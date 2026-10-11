@@ -19,7 +19,9 @@ This phase upgrades the production-quality corporate website and extends the saf
 - Production build passed
 - Build generated `/`, `/portal`, `/demo/portal`, project detail, favicon, robots and sitemap routes successfully
 - Source implementation commit: `813142e` (`feat: complete phase 1.5 quality and portal demo`)
-- Production deployment target: `https://grandharmony.vercel.app` (to be verified after this release commit is pushed)
+- Release documentation commit: `116acc6` (`docs: record phase 1.5 verification plan`)
+- Vercel production deployment: `https://grandharmony.vercel.app` — READY
+- Production smoke test passed: `/`, `/projects/700-project`, `/portal`, `/demo/portal`, `/robots.txt`, `/sitemap.xml` and `/icon.svg` returned HTTP 200.
 
 ### Known test environment limitation
 
