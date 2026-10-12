@@ -1,8 +1,11 @@
 # Status
 
-## Phase 3C — implemented; production release verification pending
+## Phase 3C — deployed; visual/native browser acceptance pending
 
 Production: https://grandharmony.vercel.app
+
+Feature release commit: `ec0932ad71661c84ee1291230a7f455282055ef6`.
+Vercel deployment: `dpl_3Gs2VzL38rmbFK7KXEfXwa6sVsQ7` (READY, Production domains assigned).
 
 ### Completed
 
@@ -22,7 +25,7 @@ Production: https://grandharmony.vercel.app
 - Six model/security tests passed. Native/original calculation parity covers 64 combinations of price, sold/retained units, marketing, contingencies, GST schemes/credits, tax losses, financing and dynamic cost rows, plus JSON restore and sensitivity prices.
 - Original asset SHA-256 remains identical.
 - No heavy dependency added.
-- Deployment commit/build and online smoke results will be recorded after the cloud release.
+- Vercel cloud Production Build succeeded. Online checks: `/` returned 200; unauthenticated Model Library and Runner resolved to `/login`; model document endpoint returned 401. No unauthorised model data was returned.
 
 ### Pending User Acceptance
 
