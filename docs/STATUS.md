@@ -1,8 +1,8 @@
 # Status
 
-## Phase 3A — implementation awaiting Neon migration and authenticated lifecycle test
+## Phase 3A — deployed; authenticated lifecycle test pending
 
-Phase 2 remains deployed. Phase 3A adds a reusable Model Library and Scenario Management foundation, but is not yet deployed because the new scenario tables must be migrated and tested through an authenticated user.
+Phase 3A adds a reusable Model Library and Scenario Management foundation. The Neon migration is verified and Production is deployed; the final authenticated lifecycle test remains pending because it requires an authorised administrator session.
 
 ### Completed in the working tree
 
@@ -21,7 +21,8 @@ Phase 2 remains deployed. Phase 3A adds a reusable Model Library and Scenario Ma
 - Database migration generation passed. The migration was applied from the authorised local Vercel environment and verified in Neon: `users`, `roles`, `projects`, `project_memberships`, `model_registry`, `model_versions` and `audit_logs` exist.
 - Production deployment succeeded from commit `49adf3fbffcc4cfe3fd655430c272d06eee39368`: https://grandharmony.vercel.app
 - Online smoke checks passed: `/`, `/login`, `/admin/initialize` and `/demo/portal` return 200; unauthenticated `/portal` is redirected server-side to `/login`.
-- Phase 3A lint, TypeScript, production build, generated migration and Drizzle history check passed locally. An authenticated save/restore test is pending database migration and deployment.
+- Phase 3A lint, TypeScript, production build, generated migration and Drizzle history check passed locally. Production deployment succeeded from commit `2d0f67cfcb904c6361dd11bb2158cfb97c15e4f4`: https://grandharmony.vercel.app
+- Online smoke checks passed: `/` and `/demo/portal` return 200; unauthenticated `/portal` and `/portal/models` are redirected server-side to `/login`.
 
 ### Known test environment limitation
 
@@ -32,4 +33,4 @@ The managed build environment does not permit binding a local port (`next dev` f
 - Neon is connected to the Vercel project on its Free plan. It injects encrypted `GH_DATABASE_URL`/`GH_*` integration variables into Development, Preview and Production; the application now supports that connection name without copying a secret.
 - `AUTH_SECRET`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_TOKEN` are configured only in Vercel Production; no Google Cloud or OAuth Client is required.
 - The initial Super Admin has not yet set a password. Complete the one-time protected setup at `/admin/initialize`, then verify a successful login and use `/admin` to create the optional second Super Admin.
-- Phase 3A is intentionally not yet deployed. No real HTML model was found; only the non-financial test adapter will be seeded by the pending migration.
+- No real HTML model was found. The deployed `Scenario State Test Model` is intentionally non-financial; an authorised administrator must validate Save, Save As, reopen and Print / Save as PDF before Phase 3A can be accepted as fully end-to-end verified.

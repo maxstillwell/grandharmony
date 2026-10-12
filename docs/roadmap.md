@@ -20,11 +20,11 @@
 - Public registration and third-party social login are intentionally excluded. The first Super Admin must be created through the one-time protected bootstrap; an existing Super Admin can create the optional second administrator.
 - Neon migration and protected bootstrap variables are configured. Production is deployed; complete the one-time Super Admin setup and login verification before giving any other users access.
 
-## Phase 3A — implementation awaiting database migration
+## Phase 3A — deployed; authenticated acceptance test pending
 
 - Reusable Model Library, server-authorised Model Runner, JSONB scenario storage, revision history, archive actions, unsaved-change warning and browser print framework are implemented in source.
 - A `Scenario State Test Model` is the only seeded model. It explicitly contains no financial formula or business data and validates saving, reopening, Save As and print flows.
-- No real standalone HTML model is present in the repository. Production deployment must wait for the Phase 3A migration and the authenticated scenario lifecycle test.
+- No real standalone HTML model is present in the repository. Production deployment and schema migration are complete; the authenticated scenario lifecycle test remains before acceptance.
 
 ## Later Phase 2 work — deferred
 
