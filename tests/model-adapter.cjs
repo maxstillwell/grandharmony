@@ -10,6 +10,8 @@ const { feasibilitySource } = require('../lib/models/feasibility-source.ts');
 const { feasibilityDocument } = require('../lib/models/html-adapter.ts');
 const { validateModelState } = require('../lib/models/validation.ts');
 const { canUseModel, canManageScenario } = require('../lib/models/permissions.ts');
+const { calculateFeasibility, sensitivityFor } = require('../lib/models/feasibility-engine.ts');
+const { feasibilityDefaults } = require('../lib/models/feasibility-defaults.ts');
 
 function modelContext(html) {
   const sent = [], listeners = {};
@@ -60,4 +62,33 @@ test('financial model and private scenario permissions deny external and unassig
   assert.equal(canUseModel({ role: 'project_manager', projects: [] }, model), false);
   assert.equal(canUseModel({ role: 'finance', projects: [{ id: '700' }] }, model), true);
   assert.equal(canManageScenario({ role: 'finance', userId: 'alice' }, 'bob'), false);
+});
+
+test('Portal-native engine matches all original outputs across 64 assumption combinations', () => {
+  const { context } = modelContext(feasibilitySource);
+  for (let index = 0; index < 64; index++) {
+    const state = structuredClone(feasibilityDefaults);
+    state.fields.price = 875321.12 + index * 15321.29;
+    state.fields.sold = index % 3 === 0 ? 0 : index % 3 === 1 ? 31 : 100;
+    state.fields.marketing = 2.37;
+    state.fields.contingency = 4.123;
+    state.gst.margin = Boolean(index & 1);
+    state.gst.marketingGst = Boolean(index & 2);
+    state.tax.lossUsable = Boolean(index & 4);
+    state.tax.loss = index & 8 ? 0 : 2104321.18;
+    state.finance.loan = index & 16 ? 6321456.78 : 0;
+    state.finance.averageDraw = 63.25;
+    state.finance.years = 2.35;
+    state.costs.push({ name: 'Dynamic row', group: 'Custom', amount: 16789.1234, mode: index & 32 ? 'net' : 'free', credit: Boolean(index & 2) });
+    context.restoredState = JSON.parse(JSON.stringify(state));
+    vm.runInContext('state=restoredState', context);
+    const original = JSON.parse(vm.runInContext('JSON.stringify(calculate())', context));
+    assert.deepEqual(calculateFeasibility(state), original, 'case ' + index);
+    const roundTripped = JSON.parse(JSON.stringify(state));
+    assert.deepEqual(calculateFeasibility(roundTripped), original);
+    for (const row of sensitivityFor(state)) {
+      context.price = row.price;
+      assert.deepEqual(row, { price: row.price, ...JSON.parse(vm.runInContext('JSON.stringify(calculate(price))', context)) });
+    }
+  }
 });

@@ -34,6 +34,15 @@
 - Automated formula/state, message-security and permission regressions pass. Authenticated online Save/Save As/reload, collapse/focus interactions and actual PDF layout remain Pending User Acceptance.
 - Further models and broad version migrations await the next owner instruction.
 
+## Phase 3C — Portal visual refinement and native model standard
+
+- Warm-white Portal visual system with restrained stone accents, editorial headings and very faint abstract line details applied to Model Library, Model Runner and Project Workspace.
+- Reusable Model Shell and workspace/scenario/history tabs; Sidebar persistence and in-place Focus remain.
+- 700 Development Feasibility is now rendered by native Portal inputs, editable costs, results, assumptions and chart components. Its original calculation body, data structure and scenario versions remain compatible.
+- Six regression tests pass, including exact original/native output comparison across 64 assumption combinations and their sensitivity ranges.
+- No database migration, deletion or new dependency is required.
+- Final production visual/browser acceptance remains with the owner. Do not begin another phase without instruction.
+
 ## Later Phase 2 work — deferred
 
 - Controlled public-content publishing workflow and model registry operations

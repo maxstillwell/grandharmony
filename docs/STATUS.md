@@ -1,39 +1,35 @@
 # Status
 
-## Phase 3B — deployed; authenticated browser acceptance pending
+## Phase 3C — implemented; production release verification pending
 
 Production: https://grandharmony.vercel.app
 
-Phase 3A was accepted by the owner (Save, Save As, restore, history, archive and print). Phase 3B imports the supplied `Grand_Harmony_700_Feasibility.html` and creates the shared Portal workspace. Feature release commit: `ec36627fdca4d992ab6bc26786cdee27301b15d3`. Vercel Production deployment `dpl_HeHdkZG6ZnEqquRqmNymHrAJVBVr` reached READY and was assigned the production domains. Subsequent verification/documentation commits are tracked by Git and Vercel.
-
 ### Completed
 
-- Shared dark sidebar with collapse/expand, persistent preference and narrow mobile rail across Portal routes.
-- In-place Focus Mode, stable model toolbar and server-validated scenario URLs; no model opens a new window.
-- Reviewed real model: `700-development-feasibility`, 700 Project, Development Feasibility, version 1.0.0. Original HTML and formulas are unchanged.
-- Authenticated document endpoint and sandboxed iframe; validated origin, Window source, model ID, instance nonce, schema version and message type.
-- Full-state adapter for numeric assumptions, toggles, financing and dynamic cost rows, with recomputed result comparison on restore.
-- Existing Neon scenario tables reused; reviewed model registers idempotently on first Super Admin library access. No schema migration or manual database step is required.
-- Save, Save As/Duplicate, rename via scenario name + Save, Open, URL restore/reload, recent revision history and Archive. Server validates state, version, project permissions, private ownership and expected revision.
-- Atomic scenario/revision/audit writes. Cross-version overwrites and stale revisions are rejected.
-- Print/PDF with scenario/project/version/date, inputs, recalculated results, sensitivity table/chart and A4 portrait/landscape controls.
+- Portal Library `/portal/models`, Model Runner `/portal/models/[modelId]` and Project Workspace `/portal/projects/[projectId]` use the refined warm-white/charcoal/stone visual system.
+- Extremely subtle thin-line motifs and editorial headings; modern sans-serif UI, quiet active states and shared cards/forms/tables/summary panels.
+- Reusable Portal-native Model Shell with breadcrumb/project/version context, stable save toolbar, workspace/scenario/history views and wide model canvas.
+- Existing dark collapsible Sidebar, persisted collapse preference and in-place Focus Mode retain their state/layout behaviour. Views keep the canvas mounted.
+- **700 Development Feasibility is Portal-native**: the active page renders native inputs, dynamic cost rows, results, assumptions, summary and sensitivity charts. It no longer renders the standalone HTML layout.
+- Original calculate body copied verbatim into the pure native engine; original HTML retained intact for reference.
+- Existing model/adapter/version IDs, Neon schema and saved Scenario JSONB structure preserved; no migration or data deletion.
+- Save, Save As, restore, rename, duplicate, archive, history and Print/PDF use the existing platform lifecycle.
+- Design and architecture formally require importing logic/data rather than legacy standalone presentation. The older bridge is retained as compatibility infrastructure; no currently active model needs it.
 
 ### Verification
 
-- Automated adapter tests: original SHA-256 match; fractional input/dynamic row JSON round-trip with identical calculation results; message origin/source/ID/schema/type rejection; malformed state rejection; role/project/private-owner denial.
-- ESLint, TypeScript and local production build passed.
-- Original model source confirmed absent from public `.next/static` assets.
-- Online checks: corporate `/` and `/demo/portal` returned 200; unauthenticated `/portal/models` resolved to the login page; the protected model document endpoint returned 401 without a session.
-- Existing production rollback candidate verified: `dpl_9FNfSsTFwLdmia2q8GCHQtxFKQij`, commit `89d2df66c25032e0d5b32f15e7de6272afeedff5`.
+- ESLint, TypeScript and Production Build passed.
+- Six model/security tests passed. Native/original calculation parity covers 64 combinations of price, sold/retained units, marketing, contingencies, GST schemes/credits, tax losses, financing and dynamic cost rows, plus JSON restore and sensitivity prices.
+- Original asset SHA-256 remains identical.
+- No heavy dependency added.
+- Deployment commit/build and online smoke results will be recorded after the cloud release.
 
-### Pending User Acceptance / limitations
+### Pending User Acceptance
 
-- The owner’s authenticated browser session is required to verify new model registration, Save A / Save As B / re-login restore and database revision history end to end. Automated model-state checks do not constitute this online acceptance.
-- Sidebar/focus browser interactions, Back/Forward unsaved-navigation handling and real PDF pagination require browser acceptance. Sidebar and Focus changes preserve the iframe instance in code.
-- The supplied model uses JavaScript Number precision and existing financial simplifications. This integration preserves them; it does not certify accounting/tax assumptions or add decimal mathematics.
-- The scenario-name field supports rename; Save As also supplies a duplicate name. Historical revisions are listed (20 most recent) and stored permanently; direct restoration of a historical revision is not added in this release.
-- The initially proposed Sales Strategy HTML has not been supplied. The supplied Feasibility model is the one imported in this phase.
+- Refined visual appearance at desktop/tablet/mobile, Sidebar/Focus interactions, native browser input editing, database-backed save/reopen and actual PDF pagination require the owner's authenticated browser acceptance.
+- Automated formula/state tests confirm mathematical compatibility; they do not claim a live authenticated browser/database lifecycle test.
+- The source model retains its original JavaScript Number precision and financial/tax assumptions; those assumptions are not certified by this UI change.
 
 ### Next step
 
-Accept the deployed real-model flow, then supply the next complete HTML/CSS/JS/assets with its version and project scope. No automatic next phase.
+Review the deployed Portal-native workspace. No new model files are needed for the current Feasibility model. Future models should include complete source/assets, version and project scope for the documented audit/native-integration process. Stop after Phase 3C.

@@ -72,3 +72,22 @@ The adapter captures the original complete state (`fields`, `gst`, `tax`, `finan
 Scenario create/save and audit/revision writes now use Neon transactional batches. Revision uniqueness and an optimistic revision condition protect concurrent writes. An older-version scenario cannot overwrite its original in a newer version; Save As is required after explicit compatibility review. Model/scenario URL parameters and revision-history requests are checked on the server. Private scenario ownership and authorised administrative scope remain enforced.
 
 For the next model, supply complete HTML/CSS/JS/assets and a version. Review dependencies and the full internal state, register a new immutable adapter/version, implement asynchronous getState/setState/validateState/getPrintData, add deterministic formula/state regression tests, and permit it in the authenticated document endpoint. Never auto-execute an arbitrary uploaded HTML or assume DOM fields represent all business state.
+
+## Phase 3C — Portal-native presentation
+
+The current **700 Development Feasibility model is fully Portal-native in the active runner**. It no longer displays an iframe or legacy standalone page. The audited original HTML remains unchanged as a reference, and the Phase 3B protected document endpoint/bridge remains available as compatibility infrastructure, not as the current presentation path. No current registered model requires an iframe for its active UI.
+
+The native engine in `feasibility-engine.ts` copies the original `calculate()` body verbatim into a pure function with an explicit state argument. The numeric conversion helper and sensitivity price rounding remain unchanged. Original defaults are a server-loaded module and are supplied only to the authenticated runner; the client formula module contains no private scenario or default project financial data. `FeasibilityCanvas` exposes the same asynchronous state/print adapter contract, validates restore state and recalculated expected results, and renders controlled native forms, editable/dynamic cost rows, tax/GST/funding assumptions, outputs and sensitivity charts.
+
+No model ID, adapter key, model version ID, schema or saved scenario shape is changed. Existing Phase 3B JSONB scenarios (including saved `__results`) are unpacked by the existing scenario runner and restored by the native adapter. Scenario actions, RBAC, private ownership, atomic revision writes and version/conflict checks are retained.
+
+`ModelShell` is reusable presentation infrastructure independent of business formulas. The common runner owns save/open/rename/duplicate/history/archive/print and Focus controls. Native models own input/output components and pure state/calculation functions. View changes keep the canvas mounted so Sidebar, Focus and workspace tabs do not discard edits.
+
+### Mandatory future import workflow
+
+1. Audit original inputs, outputs, tables, chart logic, dependencies, formulas, internal state and complete save state.
+2. Prefer Portal-native integration using reusable Portal forms/cards/tables/tabs. Use the isolated iframe bridge only for a documented temporary complexity constraint.
+3. Register a stable ID, immutable calculation version, project scope, category and description.
+4. Present inside the unified Shell. Discard legacy logo/header/font/skin/navigation; business logic and data structure are the assets.
+5. Reuse the existing server-authorised scenario lifecycle and PDF output. Preserve prior version/state compatibility explicitly.
+6. Compare every key result with the source model, test dynamic rows and JSON round-trip, and verify project/owner isolation. Mark browser checks that cannot be executed as Pending User Acceptance.
