@@ -15,6 +15,13 @@
       "when": 1791760421992,
       "tag": "0001_lucky_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791764419444,
+      "tag": "0002_tired_eternals",
+      "breakpoints": true
     }
   ]
 }
