@@ -8,9 +8,9 @@ export type PrintData = {
   sections: Array<{ heading: string; rows: Array<{ label: string; value: string }> }>;
 };
 
-export type ModelAdapter = {
-  getState(): ModelState;
-  setState(state: ModelState): void;
-  validateState(state: ModelState): ModelState;
-  getPrintData(state: ModelState): PrintData;
+export type ModelAdapter<TState = ModelState> = {
+  getState(): Promise<TState>;
+  setState(state: TState): Promise<void>;
+  validateState(state: TState): Promise<boolean>;
+  getPrintData?(): Promise<unknown>;
 };

@@ -1,89 +1,98 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { archiveScenario, createScenario, saveScenario } from "@/lib/models/actions";
-import type { ModelState, PrintData } from "@/lib/models/types";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { archiveScenario, createScenario, saveScenario, getRevisionHistory } from "@/lib/models/actions";
+import type { ModelState } from "@/lib/models/types";
+import { FocusToggle } from "@/components/portal/workspace";
+import { HtmlCanvas, type CanvasHandle, type CanvasSnapshot } from "./html-canvas";
 
 type Scenario = { id: string; name: string; notes: string | null; state: ModelState; revision: number; updatedAt: string; modelVersionId: string | null };
-type Model = { id: string; name: string; description: string; version: string | null; versionId: string | null; projectName: string | null; category: string };
-
-const initialState = { assumptionLabel: "", referenceValue: "", reviewNote: "" };
-
-function normalizeState(state: ModelState) {
-  return {
-    assumptionLabel: typeof state.assumptionLabel === "string" ? state.assumptionLabel : "",
-    referenceValue: typeof state.referenceValue === "string" ? state.referenceValue : "",
-    reviewNote: typeof state.reviewNote === "string" ? state.reviewNote : "",
-  };
+type Model = { id: string; name: string; description: string; version: string | null; versionId: string | null; projectName: string | null; category: string; adapterKey: string | null };
+const empty = { assumptionLabel: "", referenceValue: "", reviewNote: "" };
+const buttonClass = "border border-[#D7D4CC] bg-white px-3 py-2 text-xs disabled:opacity-40";
+function unpack(state: ModelState): CanvasSnapshot {
+  const { __results, ...inputs } = state;
+  return { state: inputs, results: (__results ?? {}) as Record<string, number> };
 }
 
-function printData(state: ReturnType<typeof normalizeState>): PrintData {
-  return { orientation: "portrait", sections: [{ heading: "Saved model state", rows: [{ label: "Assumption label", value: state.assumptionLabel || "—" }, { label: "Reference value", value: state.referenceValue || "—" }, { label: "Review note", value: state.reviewNote || "—" }] }] };
-}
-
-export function ScenarioRunner({ model, initialScenarios }: { model: Model; initialScenarios: Scenario[] }) {
+export function ScenarioRunner({ model, initialScenarios, initialScenarioId }: { model: Model; initialScenarios: Scenario[]; initialScenarioId?: string }) {
+  const selected = initialScenarios.find(s => s.id === initialScenarioId);
   const [scenarios, setScenarios] = useState(initialScenarios);
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
-  const [scenarioName, setScenarioName] = useState("");
-  const [notes, setNotes] = useState("");
-  const [state, setState] = useState(initialState);
-  const [savedState, setSavedState] = useState(initialState);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const dirty = JSON.stringify(state) !== JSON.stringify(savedState);
-  const currentScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? null;
-  const data = useMemo(() => printData(state), [state]);
-
+  const [scenarioId, setScenarioId] = useState<string | null>(selected?.id ?? null);
+  const [name, setName] = useState(selected?.name ?? "");
+  const [notes, setNotes] = useState(selected?.notes ?? "");
+  const [state, setState] = useState<ModelState>(selected?.state ?? empty);
+  const [saved, setSaved] = useState({ state: selected?.state ?? empty, name: selected?.name ?? "", notes: selected?.notes ?? "" });
+  const [results, setResults] = useState<Record<string, number>>({});
+  const [sensitivity, setSensitivity] = useState<Array<Record<string, number>>>([]);
+  const [orientation, setOrientation] = useState("landscape");
+  const [message, setMessage] = useState("");
+  const [ready, setReady] = useState(model.adapterKey !== "700-feasibility-v1");
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof getRevisionHistory>> | null>(null);
+  const [pending, startTransition] = useTransition();
+  const canvas = useRef<CanvasHandle>(null);
+  const html = model.adapterKey === "700-feasibility-v1";
+  const current = scenarios.find(s => s.id === scenarioId);
+  const dirty = JSON.stringify({ state, name, notes }) !== JSON.stringify(saved);
+  const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
+  const actionRef = useRef(pending); actionRef.current = pending;
   useEffect(() => {
-    const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-
-  function openScenario(id: string) {
-    const next = scenarios.find((scenario) => scenario.id === id);
-    if (!next) return;
-    if (dirty && !window.confirm("You have unsaved changes. Open another scenario anyway?")) return;
-    const nextState = normalizeState(next.state);
-    setScenarioId(next.id); setScenarioName(next.name); setNotes(next.notes ?? ""); setState(nextState); setSavedState(nextState); setFeedback(`Opened ${next.name}.`);
+    function unload(event: BeforeUnloadEvent) { if (dirtyRef.current || actionRef.current) { event.preventDefault(); event.returnValue = ""; } }
+    function click(event: MouseEvent) {
+      const anchor = (event.target as Element).closest("a[href]");
+      if (anchor && (dirtyRef.current || actionRef.current) && !window.confirm("Unsaved changes. Leave this model?")) { event.preventDefault(); event.stopPropagation(); }
+    }
+    function back() { if (dirtyRef.current && !window.confirm("Unsaved changes. Leave this model?")) window.history.forward(); }
+    window.addEventListener("beforeunload", unload); document.addEventListener("click", click, true); window.addEventListener("popstate", back);
+    return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", click, true); window.removeEventListener("popstate", back); };
+  }, []);
+  function url(id: string | null) { window.history.replaceState(null, "", id ? "?scenario=" + id : window.location.pathname); }
+  async function restore(next: Scenario) {
+    if (dirty && !window.confirm("Discard unsaved changes and open this scenario?")) return;
+    try {
+      if (html) await canvas.current?.setState(unpack(next.state));
+      const restoredState = html ? unpack(next.state).state : next.state;
+      setScenarioId(next.id); setName(next.name); setNotes(next.notes ?? ""); setState(restoredState); setSaved({ state: restoredState, name: next.name, notes: next.notes ?? "" }); setHistory(null); url(next.id); setMessage("Scenario restored and calculation results verified.");
+      if (html) { const snapshot = await canvas.current?.getState(); if (snapshot) setResults(snapshot.results); }
+    } catch (error) { setMessage(String(error)); }
   }
-
-  function newScenario() {
-    if (dirty && !window.confirm("You have unsaved changes. Start a new scenario anyway?")) return;
-    setScenarioId(null); setScenarioName(""); setNotes(""); setState(initialState); setSavedState(initialState); setFeedback("New private scenario. Enter a name before saving.");
+  async function reset() {
+    if (dirty && !window.confirm("Discard unsaved changes?")) return;
+    try {
+      const snapshot = html ? await canvas.current?.reset() : null;
+      const nextState = snapshot?.state ?? empty;
+      setScenarioId(null); setName(""); setNotes(""); setState(nextState); setSaved({ state: nextState, name: "", notes: "" }); setResults(snapshot?.results ?? {}); setHistory(null); url(null);
+    } catch (error) { setMessage(String(error)); }
   }
-
-  function updateField(field: keyof typeof initialState, value: string) { setState((current) => ({ ...current, [field]: value })); }
-
-  function persist(asCopy = false) {
-    if (!scenarioName.trim()) { setFeedback("Enter a Scenario Name before saving."); return; }
-    const payload = { modelId: model.id, name: scenarioName, notes, state };
+  function persist(copy = false) {
+    let nextName = name.trim();
+    if (copy) nextName = window.prompt("Name for the new scenario", nextName + " — copy")?.trim() ?? "";
+    if (!nextName) { setMessage("Enter a scenario name before saving."); return; }
     startTransition(async () => {
       try {
-        const saved = asCopy || !scenarioId ? await createScenario(payload) : await saveScenario({ ...payload, scenarioId });
-        const next: Scenario = { id: saved.id, name: scenarioName.trim(), notes: notes.trim() || null, state, revision: saved.revision, updatedAt: saved.updatedAt, modelVersionId: saved.modelVersionId };
-        setScenarios((current) => [next, ...current.filter((scenario) => scenario.id !== next.id)]);
-        setScenarioId(next.id); setSavedState(state); setFeedback(asCopy ? "Saved as a new private scenario." : "Scenario saved.");
-      } catch (error) { setFeedback(error instanceof Error ? error.message : "Scenario could not be saved."); }
+        const snapshot = html ? await canvas.current?.getState() : null;
+        const nextState = snapshot?.state ?? state;
+        const persistedState = snapshot ? { ...nextState, __results: snapshot.results } : nextState;
+        const payload = { modelId: model.id, modelVersionId: model.versionId, name: nextName, notes, state: persistedState };
+        const result = copy || !scenarioId ? await createScenario(payload) : await saveScenario({ ...payload, scenarioId, expectedRevision: current?.revision ?? 0 });
+        const next = { id: result.id, name: nextName, notes, state: persistedState, revision: result.revision, updatedAt: result.updatedAt, modelVersionId: result.modelVersionId };
+        setScenarios(items => [next, ...items.filter(s => s.id !== next.id)]); setScenarioId(next.id); setName(nextName); setState(nextState); setSaved({ state: nextState, name: nextName, notes }); setHistory(null); url(next.id); setMessage(copy ? "Saved as a new scenario. Original preserved." : "Scenario saved.");
+      } catch (error) { setMessage(error instanceof Error ? error.message : "Save failed."); }
     });
   }
-
-  function archiveCurrent() {
-    if (!scenarioId || !window.confirm("Archive this scenario? It will no longer appear in the active list.")) return;
-    startTransition(async () => {
-      try {
-        await archiveScenario(model.id, scenarioId);
-        setScenarios((current) => current.filter((scenario) => scenario.id !== scenarioId));
-        newScenario(); setFeedback("Scenario archived.");
-      } catch (error) { setFeedback(error instanceof Error ? error.message : "Scenario could not be archived."); }
-    });
+  function loadHistory() { if (!scenarioId) return; startTransition(async () => { try { setHistory(await getRevisionHistory(model.id, scenarioId)); } catch (error) { setMessage(String(error)); } }); }
+  function archive() { if (!scenarioId || !window.confirm("Archive this scenario?")) return; startTransition(async () => { try { await archiveScenario(model.id, scenarioId); setScenarios(items => items.filter(s => s.id !== scenarioId)); setScenarioId(null); url(null); setMessage("Scenario archived. State remains on screen; Save As to keep a copy."); } catch (error) { setMessage(String(error)); } }); }
+  async function print() { try { if (html) { const snapshot = await canvas.current?.getPrintData(); if (snapshot) { setResults(snapshot.results); setState(snapshot.state); setSensitivity(snapshot.sensitivity ?? []); } } setTimeout(() => window.print(), 100); } catch (error) { setMessage(String(error)); } }
+  async function modelReady(snapshot: CanvasSnapshot) {
+    try { if (selected) { await canvas.current?.setState(unpack(selected.state)); const restored = await canvas.current?.getState(); if (restored) { setState(restored.state); setSaved({ state: restored.state, name: selected.name, notes: selected.notes ?? "" }); setResults(restored.results); } } else { setState(snapshot.state); setSaved({ state: snapshot.state, name: "", notes: "" }); setResults(snapshot.results); } setReady(true); } catch (error) { setMessage("Restore failed: " + String(error)); }
   }
-
-  return <main className="min-h-screen bg-[#F8F8F6] text-[#121316]">
-    <header className="no-print border-b border-[#E2E0D9] bg-white px-5 py-4 sm:px-8"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4"><Link href="/portal/models" className="mono text-[10px] tracking-[.12em] underline">← BACK TO LIBRARY</Link><div className="flex flex-wrap gap-2"><button onClick={newScenario} className="border border-[#121316] px-3 py-2 text-xs">New Scenario</button><label className="border border-[#E2E0D9] bg-white px-3 py-2 text-xs">Open <select aria-label="Open scenario" value={scenarioId ?? ""} onChange={(event) => event.target.value && openScenario(event.target.value)} className="ml-2 bg-transparent"><option value="">Choose saved scenario</option>{scenarios.map((scenario) => <option value={scenario.id} key={scenario.id}>{scenario.name} · r{scenario.revision}</option>)}</select></label><button onClick={() => persist(false)} disabled={isPending} className="bg-[#121316] px-3 py-2 text-xs text-white disabled:opacity-50">Save</button><button onClick={() => persist(true)} disabled={isPending} className="border border-[#121316] px-3 py-2 text-xs disabled:opacity-50">Save As</button><button onClick={() => window.print()} className="border border-[#121316] px-3 py-2 text-xs">Print / PDF</button></div></div></header>
-    <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8"><section className="print-header border-b border-[#E2E0D9] pb-6"><p className="eyebrow">Model runner · {model.category.replaceAll("_", " ")}</p><h1 className="display mt-2 text-4xl">{model.name}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#5C5E64]">{model.description}</p><div className="mono mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[10px] text-[#6E6A5F]"><span>MODEL ID · {model.id}</span><span>VERSION · {model.version ?? "No version"}</span><span>PROJECT · {model.projectName ?? "General tool"}</span><span>PRINTED · {new Date().toLocaleDateString("en-AU")}</span></div></section>
-      <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]"><section className="border border-[#E2E0D9] bg-white p-5 sm:p-7"><p className="eyebrow">Test adapter</p><h2 className="mt-2 text-xl font-medium">State save and restore test</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-[#5C5E64]">This is a framework validation adapter only. It contains no financial formulas, project data or decision output. A real HTML model can later supply its own adapter while using the same scenario platform.</p><div className="mt-8 grid gap-5 sm:grid-cols-2"><label className="block text-xs font-medium">Assumption label<input value={state.assumptionLabel} onChange={(event) => updateField("assumptionLabel", event.target.value)} className="mt-2 w-full border border-[#D7D4CC] px-3 py-2 text-sm" placeholder="e.g. Base review" /></label><label className="block text-xs font-medium">Reference value<input value={state.referenceValue} onChange={(event) => updateField("referenceValue", event.target.value)} className="mt-2 w-full border border-[#D7D4CC] px-3 py-2 text-sm" placeholder="Non-financial reference" /></label></div><label className="mt-5 block text-xs font-medium">Review note<textarea value={state.reviewNote} onChange={(event) => updateField("reviewNote", event.target.value)} className="mt-2 min-h-36 w-full border border-[#D7D4CC] px-3 py-2 text-sm" placeholder="State restored through the test adapter…" /></label><div className="mt-8 border-t border-[#E2E0D9] pt-5"><p className="eyebrow">Print data preview</p>{data.sections.map((section) => <div className="mt-3" key={section.heading}><h3 className="text-sm font-medium">{section.heading}</h3><dl className="mt-2 grid gap-px border border-[#E2E0D9] bg-[#E2E0D9] sm:grid-cols-3">{section.rows.map((row) => <div className="bg-[#F8F8F6] p-3" key={row.label}><dt className="mono text-[10px] text-[#6E6A5F]">{row.label}</dt><dd className="mt-1 text-sm">{row.value}</dd></div>)}</dl></div>)}</div></section>
-        <aside className="no-print h-fit border border-[#E2E0D9] bg-white p-5"><p className="eyebrow">Scenario</p><label className="mt-5 block text-xs font-medium">Scenario name<input value={scenarioName} onChange={(event) => setScenarioName(event.target.value)} className="mt-2 w-full border border-[#D7D4CC] px-3 py-2 text-sm" placeholder="Required on first save" /></label><label className="mt-4 block text-xs font-medium">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-2 min-h-24 w-full border border-[#D7D4CC] px-3 py-2 text-sm" placeholder="Private notes" /></label><div className="mt-5 border-t border-[#E2E0D9] pt-4 text-xs leading-5 text-[#5C5E64]"><p>{scenarioId ? `Revision ${currentScenario?.revision ?? "—"}` : "Unsaved private scenario"}</p><p>{dirty ? "Unsaved changes" : "All changes saved"}</p>{currentScenario?.modelVersionId && currentScenario.modelVersionId !== model.versionId ? <p className="mt-3 border border-[#9A6A27]/50 bg-[#F6D6A4]/30 p-2 text-[#6A4717]">This scenario was saved with a different model version. Review its state before saving again.</p> : null}</div>{feedback ? <p role="status" className="mt-5 border border-[#D7D4CC] bg-[#F8F8F6] p-3 text-xs leading-5">{feedback}</p> : null}{scenarioId ? <button onClick={archiveCurrent} disabled={isPending} className="mt-5 text-xs text-[#6A4717] underline disabled:opacity-50">Archive scenario</button> : null}</aside>
-      </div></div></main>;
+  return <main className="bg-[#F8F8F6] text-[#121316]">
+    <header className="model-toolbar no-print sticky top-0 z-20 border-b border-[#E2E0D9] bg-white px-4 py-3"><div className="flex flex-wrap items-center gap-2"><Link href="/portal/models" className={buttonClass}>← Library</Link><span className="mr-auto text-xs font-medium">{model.name} / {name || "New Scenario"} {dirty && <span className="ml-2 text-amber-800">Unsaved Changes</span>}</span><FocusToggle /><button className={buttonClass} disabled={pending || !ready} onClick={reset}>New</button><button className={buttonClass} disabled={pending || !ready} onClick={() => persist()}>Save</button><button className={buttonClass} disabled={pending || !ready} onClick={() => persist(true)}>Save As / Duplicate</button><select aria-label="Open scenario" className={buttonClass} disabled={pending || !ready} value={scenarioId ?? ""} onChange={event => { const next = scenarios.find(s => s.id === event.target.value); if (next) void restore(next); }}><option value="">Open Scenario</option>{scenarios.map(s => <option key={s.id} value={s.id}>{s.name} · r{s.revision}</option>)}</select><button className={buttonClass} disabled={!scenarioId || pending} onClick={loadHistory}>Revision History</button><button className={buttonClass} disabled={!ready} onClick={print}>Print / Save as PDF</button></div><p role="status" className="mt-2 text-xs text-[#6E6A5F]">{message || (ready ? "Private scenario · " + (dirty ? "Unsaved changes" : "Saved state") : "Loading model adapter…")}</p></header>
+    <section className="model-editing no-print flex flex-wrap items-end gap-4 border-b border-[#E2E0D9] p-4"><label className="text-xs">Scenario name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} className="ml-2 border p-2" /></label><label className="text-xs">Notes<input value={notes} maxLength={2000} onChange={event => setNotes(event.target.value)} className="ml-2 border p-2" /></label><span className="text-xs">{model.projectName ?? "General tool"} · v{model.version} · {current ? "Revision " + current.revision : "New"}</span>{scenarioId && <button disabled={pending} onClick={archive} className={buttonClass}>Archive</button>}</section>
+    {history && <section className="no-print border-b bg-white p-5"><h2 className="text-sm font-medium">Recent Revision History</h2><ul className="mt-3 space-y-2 text-xs">{history.map(row => <li key={row.id}>Revision {row.revision} · {new Date(row.createdAt).toLocaleString("en-AU")} · {row.notes || "No notes"}</li>)}</ul></section>}
+    {current?.modelVersionId && current.modelVersionId !== model.versionId && <p className="no-print bg-amber-50 p-4 text-sm">Older model version: review compatibility and use Save As. The original scenario is preserved.</p>}
+    <style>{`@media print { @page { size: A4 ${orientation}; margin: 12mm; } }`}</style><div className="no-print flex justify-end px-4 py-2"><label className="text-xs">Print layout <select aria-label="Print orientation" className="ml-2 border p-1" value={orientation} onChange={event => setOrientation(event.target.value)}><option value="landscape">A4 Landscape</option><option value="portrait">A4 Portrait</option></select></label></div><div className="model-editing overflow-x-auto">{html ? <HtmlCanvas ref={canvas} modelId={model.id} onReady={modelReady} onChange={snapshot => { setState(snapshot.state); setResults(snapshot.results); }} /> : <section className="m-5 border bg-white p-6"><h1 className="display text-3xl">{model.name}</h1><p className="mt-2 text-sm">{model.description}</p>{Object.entries(state).map(([key, value]) => <label key={key} className="mt-5 block text-xs">{key}<input className="ml-3 border p-2" value={String(value)} onChange={event => setState(current => ({ ...current, [key]: event.target.value }))} /></label>)}</section>}</div>
+    <section className="model-print p-4"><h1 className="text-2xl">{model.name}</h1><p>{name || "Unsaved scenario"} · {model.projectName} · Version {model.version} · {new Date().toLocaleString("en-AU")}</p><p className="my-3">{notes}</p><h2 className="mt-4 text-lg">Inputs and complete cost rows (AUD)</h2>{Object.entries(state).map(([section, value]) => <div key={section} className="my-3 break-inside-avoid"><h3>{section}</h3><pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(value, null, 2)}</pre></div>)}<h2 className="mt-4 text-lg">Recalculated results (AUD)</h2><table className="w-full text-sm"><tbody>{Object.entries(results).map(([key, value]) => <tr key={key}><td className="border-b p-2">{key}</td><td className="border-b p-2">{value.toLocaleString("en-AU", { maximumFractionDigits: 8 })}</td></tr>)}</tbody></table><h2 className="mt-5 text-lg">Sales price sensitivity</h2><table className="w-full text-sm"><thead><tr>{["Price", "Revenue", "Pre-tax profit", "After-tax profit"].map(label => <th key={label} className="border-b p-2 text-left">{label}</th>)}</tr></thead><tbody>{sensitivity.map(row => <tr key={row.price}>{[row.price, row.revenue, row.profit, row.after].map((value, i) => <td className="border-b p-2" key={i}>{value.toLocaleString("en-AU", { maximumFractionDigits: 2 })}</td>)}</tr>)}</tbody></table><div className="mt-5 flex items-end gap-3" style={{ height: 160 }}>{sensitivity.map(row => <div key={row.price} className="flex flex-1 flex-col items-center justify-end text-xs"><span>{(row.profit / 1000000).toFixed(2)}M</span><div style={{ width: "70%", height: Math.max(3, Math.abs(row.profit) / Math.max(1, ...sensitivity.map(item => Math.abs(item.profit))) * 100), background: row.profit >= 0 ? "#4c8497" : "#b16a60", printColorAdjust: "exact" }} /><span>{(row.price / 1000000).toFixed(2)}M</span></div>)}</div><p className="mt-5 text-xs">Original model assumptions require professional review. Scenario values reflect the supplied model formulas.</p></section>
+  </main>;
 }

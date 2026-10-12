@@ -1,36 +1,38 @@
 # Status
 
-## Phase 3A — deployed; authenticated lifecycle test pending
+## Phase 3B — implementation complete; release verification in progress
 
-Phase 3A adds a reusable Model Library and Scenario Management foundation. The Neon migration is verified and Production is deployed; the final authenticated lifecycle test remains pending because it requires an authorised administrator session.
+Production: https://grandharmony.vercel.app
 
-### Completed in the working tree
+Phase 3A was accepted by the owner (Save, Save As, restore, history, archive and print). Phase 3B imports the supplied `Grand_Harmony_700_Feasibility.html` and creates the shared Portal workspace. Release commit and Vercel build status are recorded in Git/Vercel; final online evidence follows the deployment.
 
-- Drizzle ORM schema and generated migrations for users, roles, project memberships, model registry/versioning and audit logs, including a password-hash field.
-- Auth.js credentials login with a fail-closed authorization check; no public registration or third-party social login exists.
-- Server-side Portal and Super Admin guards, one-time protected password bootstrap, optional second Super Admin creation, role/project assignment actions and audit logging.
-- Authenticated project workspace and model registry routes; existing `/demo/portal` remains untouched as an explicit demonstration.
-- `.env.example`, migration scripts and Phase 2 architecture/roadmap documentation.
-- Phase 3A Model Library filters, server-authorised Model Runner, private JSONB scenarios, Save, Save As, archive, revision snapshots, print stylesheet and test adapter.
+### Completed
+
+- Shared dark sidebar with collapse/expand, persistent preference and narrow mobile rail across Portal routes.
+- In-place Focus Mode, stable model toolbar and server-validated scenario URLs; no model opens a new window.
+- Reviewed real model: `700-development-feasibility`, 700 Project, Development Feasibility, version 1.0.0. Original HTML and formulas are unchanged.
+- Authenticated document endpoint and sandboxed iframe; validated origin, Window source, model ID, instance nonce, schema version and message type.
+- Full-state adapter for numeric assumptions, toggles, financing and dynamic cost rows, with recomputed result comparison on restore.
+- Existing Neon scenario tables reused; reviewed model registers idempotently on first Super Admin library access. No schema migration or manual database step is required.
+- Save, Save As/Duplicate, rename via scenario name + Save, Open, URL restore/reload, recent revision history and Archive. Server validates state, version, project permissions, private ownership and expected revision.
+- Atomic scenario/revision/audit writes. Cross-version overwrites and stale revisions are rejected.
+- Print/PDF with scenario/project/version/date, inputs, recalculated results, sensitivity table/chart and A4 portrait/landscape controls.
 
 ### Verification
 
-- ESLint passed
-- TypeScript validation passed
-- Production build passed with protected Portal, login, admin, Auth.js and project workspace routes.
-- Database migration generation passed. The migration was applied from the authorised local Vercel environment and verified in Neon: `users`, `roles`, `projects`, `project_memberships`, `model_registry`, `model_versions` and `audit_logs` exist.
-- Production deployment succeeded from commit `49adf3fbffcc4cfe3fd655430c272d06eee39368`: https://grandharmony.vercel.app
-- Online smoke checks passed: `/`, `/login`, `/admin/initialize` and `/demo/portal` return 200; unauthenticated `/portal` is redirected server-side to `/login`.
-- Phase 3A lint, TypeScript, production build, generated migration and Drizzle history check passed locally. Production deployment succeeded from commit `2d0f67cfcb904c6361dd11bb2158cfb97c15e4f4`: https://grandharmony.vercel.app
-- Online smoke checks passed: `/` and `/demo/portal` return 200; unauthenticated `/portal` and `/portal/models` are redirected server-side to `/login`.
+- Automated adapter tests: original SHA-256 match; fractional input/dynamic row JSON round-trip with identical calculation results; message origin/source/ID/schema/type rejection; malformed state rejection; role/project/private-owner denial.
+- ESLint, TypeScript and local production build passed.
+- Original model source confirmed absent from public `.next/static` assets.
+- Existing production rollback candidate verified: `dpl_9FNfSsTFwLdmia2q8GCHQtxFKQij`, commit `89d2df66c25032e0d5b32f15e7de6272afeedff5`.
 
-### Known test environment limitation
+### Pending User Acceptance / limitations
 
-The managed build environment does not permit binding a local port (`next dev` fails with `EPERM`), so desktop/mobile browser emulation cannot run locally. Responsive layouts were reviewed from their Tailwind breakpoints and production route smoke tests will be performed after deployment.
+- The owner’s authenticated browser session is required to verify new model registration, Save A / Save As B / re-login restore and database revision history end to end. Automated model-state checks do not constitute this online acceptance.
+- Sidebar/focus browser interactions, Back/Forward unsaved-navigation handling and real PDF pagination require browser acceptance. Sidebar and Focus changes preserve the iframe instance in code.
+- The supplied model uses JavaScript Number precision and existing financial simplifications. This integration preserves them; it does not certify accounting/tax assumptions or add decimal mathematics.
+- The scenario-name field supports rename; Save As also supplies a duplicate name. Historical revisions are listed (20 most recent) and stored permanently; direct restoration of a historical revision is not added in this release.
+- The initially proposed Sales Strategy HTML has not been supplied. The supplied Feasibility model is the one imported in this phase.
 
-## Known limits
+### Next step
 
-- Neon is connected to the Vercel project on its Free plan. It injects encrypted `GH_DATABASE_URL`/`GH_*` integration variables into Development, Preview and Production; the application now supports that connection name without copying a secret.
-- `AUTH_SECRET`, `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_TOKEN` are configured only in Vercel Production; no Google Cloud or OAuth Client is required.
-- The initial Super Admin has not yet set a password. Complete the one-time protected setup at `/admin/initialize`, then verify a successful login and use `/admin` to create the optional second Super Admin.
-- No real HTML model was found. The deployed `Scenario State Test Model` is intentionally non-financial; an authorised administrator must validate Save, Save As, reopen and Print / Save as PDF before Phase 3A can be accepted as fully end-to-end verified.
+Accept the deployed real-model flow, then supply the next complete HTML/CSS/JS/assets with its version and project scope. No automatic next phase.

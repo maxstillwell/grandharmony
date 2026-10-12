@@ -23,4 +23,16 @@ a { color: inherit; text-decoration: none; }
   .no-print { display: none !important; }
   .print-header { break-after: avoid; }
   body { background: white; }
+  .portal-workspace { display: block !important; }
+  .workspace-content { width: 100%; }
+  .model-toolbar, .model-editing { display: none !important; }
+  .model-print { display: block !important; }
+}
+.portal-workspace { display: grid; min-height: 100vh; }
+.workspace-focus .workspace-content { width: 100%; }
+.model-print { display: none; }
+@media (max-width: 640px) {
+  .portal-workspace:not(.workspace-focus) { grid-template-columns: 64px minmax(0, 1fr) !important; }
+  .workspace-sidebar { padding: 6px; }
+  .workspace-sidebar nav span, .workspace-sidebar button span { display: none; }
 }

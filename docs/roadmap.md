@@ -20,11 +20,19 @@
 - Public registration and third-party social login are intentionally excluded. The first Super Admin must be created through the one-time protected bootstrap; an existing Super Admin can create the optional second administrator.
 - Neon migration and protected bootstrap variables are configured. Production is deployed; complete the one-time Super Admin setup and login verification before giving any other users access.
 
-## Phase 3A — deployed; authenticated acceptance test pending
+## Phase 3A — user accepted
 
 - Reusable Model Library, server-authorised Model Runner, JSONB scenario storage, revision history, archive actions, unsaved-change warning and browser print framework are implemented in source.
 - A `Scenario State Test Model` is the only seeded model. It explicitly contains no financial formula or business data and validates saving, reopening, Save As and print flows.
-- No real standalone HTML model is present in the repository. Production deployment and schema migration are complete; the authenticated scenario lifecycle test remains before acceptance.
+- The owner confirmed Save, Save As, restore, revision history, archive and print acceptance in the Phase 3B instructions.
+
+## Phase 3B — unified workspace and real feasibility model
+
+- Shared persisted collapsible Sidebar, in-place Focus Mode, guarded scenario URLs and stable model toolbar.
+- Reviewed 700 Development Feasibility HTML integrated with a sandboxed, message-validated full-state adapter and recomputation checks.
+- Existing scenario database reused; registration is automatic and idempotent, requiring no manual migration.
+- Automated formula/state, message-security and permission regressions pass. Authenticated online Save/Save As/reload, collapse/focus interactions and actual PDF layout remain Pending User Acceptance.
+- Further models and broad version migrations await the next owner instruction.
 
 ## Later Phase 2 work — deferred
 
