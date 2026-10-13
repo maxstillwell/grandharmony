@@ -7,6 +7,9 @@ Production: https://grandharmony.vercel.app
 Feature commit: `33a42c3f2c2c994cac2b86da11d3f48e68c444b5`.
 Vercel deployment: `dpl_BwaVek4XB52apmhUPu83xg6LMrDF` (READY; Production domains assigned).
 
+Phase 4A.1 no-Blob feature commit: `0c14ab15e8b64b88ca856ce86d594124fac13c2d`.
+Production verification deployment: `dpl_Hp6TPjBg485diLMGCxsFMCpxdc3X` (READY; Production domains assigned).
+
 ### Completed in source
 
 - Public corporate website redesigned to the approved architectural/quiet-luxury direction, including the required Hero, About, Experience, Construction Expertise, Expertise, Team, Selected Developments, Contact and footer sections.
