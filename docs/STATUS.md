@@ -1,6 +1,6 @@
 # Status
 
-## Phase 4A.1 — Website Management activation blocked at safe migration boundary
+## Phase 4A.1 — Website Management database migration applied; no-Blob activation deployed
 
 Production: https://grandharmony.vercel.app
 
@@ -23,16 +23,16 @@ Vercel deployment: `dpl_BwaVek4XB52apmhUPu83xg6LMrDF` (READY; Production domains
 - Generated migration is additive; it does not alter or delete existing model, scenario, project, user or Auth.js tables.
 - Vercel cloud build for the feature commit reached READY. Public `/` returned HTTP 200 and rendered the approved Hero statement. Unauthenticated `/portal/website` and `/portal/models` resolved to the existing sign-in requirement.
 
-### Migration verification / blocker
+### Migration verification
 
 - Production Vercel environment inspection confirms the existing Neon integration is scoped to Grand Harmony. The migration is the additive Drizzle file `drizzle/0003_sudden_proteus.sql`; it creates only `website_revisions`, `website_media`, `website_publish_events` and their enums/indexes/foreign keys. It contains no `DROP`, `TRUNCATE`, `ALTER` of existing tables, reset or `db:push` operation.
-- This execution environment has no Vercel CLI login and therefore cannot obtain the production-only database credential. The attempted production environment pull stopped before creating an `.env.local` file. `npm run db:migrate` cannot be safely run here, so migration, Save Draft, Preview, Publish and Restore have **not** been claimed as passed and no further production deployment is authorised for Phase 4A.1.
+- The owner ran `npm run db:migrate` from the Vercel-linked production repository after syncing the migration. Neon Primary was verified to contain all three expected tables. Existing initial migrations remain intact.
 - No Vercel Blob store/token is connected to the Grand Harmony Vercel project. Upload, replacement, media inspection and deletion are intentionally disabled. Connect an approved Blob Store (confirming any pricing/authorisation in Vercel) to enable the hardened upload route in the next narrowly scoped update.
 - Authenticated browser tests for draft isolation, publish/rollback and actual media/video upload require owner acceptance after the migration/storage setup. No unverified claim is made for these flows.
 
 ### Next step
 
-Apply the additive website migration from an authenticated Vercel-linked machine, then open `/portal/website` as Super Admin, create a draft, preview it and publish. Stop after Phase 4A.1; do not begin financial models or CRM work.
+Open `/portal/website` as Super Admin, create a draft, preview it and publish. The authenticated Draft → Preview → Publish → Restore browser acceptance remains pending because it cannot be performed without an administrator session. Stop after Phase 4A.1; do not begin financial models or CRM work.
 
 ## Phase 3C — deployed; visual/native browser acceptance pending
 
