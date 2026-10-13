@@ -1,8 +1,11 @@
 # Status
 
-## Phase 4A — implemented in source; migration and Blob authorisation pending
+## Phase 4A — deployed with safe fallback; migration and Blob authorisation pending
 
 Production: https://grandharmony.vercel.app
+
+Feature commit: `33a42c3f2c2c994cac2b86da11d3f48e68c444b5`.
+Vercel deployment: `dpl_BwaVek4XB52apmhUPu83xg6LMrDF` (READY; Production domains assigned).
 
 ### Completed in source
 
@@ -17,6 +20,7 @@ Production: https://grandharmony.vercel.app
 
 - ESLint, TypeScript, production build and `git diff --check` passed.
 - Generated migration is additive; it does not alter or delete existing model, scenario, project, user or Auth.js tables.
+- Vercel cloud build for the feature commit reached READY. Public `/` returned HTTP 200 and rendered the approved Hero statement. Unauthenticated `/portal/website` and `/portal/models` resolved to the existing sign-in requirement.
 
 ### Blockers / pending owner action
 
