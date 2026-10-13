@@ -43,6 +43,14 @@
 - No database migration, deletion or new dependency is required.
 - Final production visual/browser acceptance remains with the owner. Do not begin another phase without instruction.
 
+## Phase 4A — corporate redesign and Website Management
+
+- Redesigned public corporate home around the approved “Built on Experience. Driven by Vision.” architecture-led hero, approved company copy, experience, construction, expertise, team, selected-development and verified-contact-safe sections.
+- Added a Super Admin-only `/portal/website` module and protected `/portal/website/preview` draft preview. Structured Hero, copy, visibility, Team and Development gallery fields are versioned as a private website draft.
+- Added safe revision/publish/restore schema and server-side publish actions. Published public content is revalidated without a code deployment; drafts are not public.
+- Added a media metadata registry schema. Vercel Blob upload/replacement/deletion remains blocked until an owner explicitly connects a Blob Store and provides the integration environment variable; this avoids an unapproved paid storage activation.
+- The `0003_sudden_proteus.sql` migration must be applied to Neon before the authenticated management UI becomes operational. Existing public fallback and all Portal/model tables remain unaffected.
+
 ## Later Phase 2 work — deferred
 
 - Controlled public-content publishing workflow and model registry operations

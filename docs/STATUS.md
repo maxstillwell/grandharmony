@@ -1,5 +1,33 @@
 # Status
 
+## Phase 4A — implemented in source; migration and Blob authorisation pending
+
+Production: https://grandharmony.vercel.app
+
+### Completed in source
+
+- Public corporate website redesigned to the approved architectural/quiet-luxury direction, including the required Hero, About, Experience, Construction Expertise, Expertise, Team, Selected Developments, Contact and footer sections.
+- Hero supports controlled image/video mode, poster fallback, muted looping inline video, responsive crop, reduced-motion behaviour, text alignment and overlay presets.
+- Added Super Admin-only Website Management at `/portal/website`, including private structured draft creation/editing, protected preview, explicit publish and restore-to-new-draft workflows.
+- Added versioned public content schema, metadata-only media registry and publishing/audit event tables in safe additive migration `drizzle/0003_sudden_proteus.sql`.
+- Public pages read only the latest published revision and safely fall back to reviewed source content if website tables are unavailable. Internal project data is never automatically published.
+- Existing models, scenarios, auth, RBAC and project access code are untouched.
+
+### Verification completed locally
+
+- ESLint, TypeScript, production build and `git diff --check` passed.
+- Generated migration is additive; it does not alter or delete existing model, scenario, project, user or Auth.js tables.
+
+### Blockers / pending owner action
+
+- The execution environment has no direct Neon migration credential. Apply `drizzle/0003_sudden_proteus.sql` (or run `npm run db:migrate` in the already linked repository with the production Vercel environment) before Website Management can read/write its tables. Until then public production stays on the safe fallback website.
+- No Vercel Blob store/token is connected to the Grand Harmony Vercel project. Upload, replacement, media inspection and deletion are intentionally disabled. Connect an approved Blob Store (confirming any pricing/authorisation in Vercel) to enable the hardened upload route in the next narrowly scoped update.
+- Authenticated browser tests for draft isolation, publish/rollback and actual media/video upload require owner acceptance after the migration/storage setup. No unverified claim is made for these flows.
+
+### Next step
+
+Apply the additive website migration, then open `/portal/website` as Super Admin, create a draft, preview it and publish. Stop after Phase 4A; do not begin financial models or CRM work.
+
 ## Phase 3C — deployed; visual/native browser acceptance pending
 
 Production: https://grandharmony.vercel.app

@@ -22,6 +22,13 @@
       "when": 1791764419444,
       "tag": "0002_tired_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791873536082,
+      "tag": "0003_sudden_proteus",
+      "breakpoints": true
     }
   ]
 }

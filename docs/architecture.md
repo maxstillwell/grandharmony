@@ -91,3 +91,13 @@ No model ID, adapter key, model version ID, schema or saved scenario shape is ch
 4. Present inside the unified Shell. Discard legacy logo/header/font/skin/navigation; business logic and data structure are the assets.
 5. Reuse the existing server-authorised scenario lifecycle and PDF output. Preserve prior version/state compatibility explicitly.
 6. Compare every key result with the source model, test dynamic rows and JSON round-trip, and verify project/owner isolation. Mark browser checks that cannot be executed as Pending User Acceptance.
+
+## Phase 4A — public content publication surface
+
+The public site reads a server-side `WebsiteContent` document. If there is no successfully published database revision, it renders the reviewed source-controlled default configuration. This means an unavailable or failed content migration never removes the public corporate page.
+
+`website_revisions` stores an entire structured content snapshot as JSONB with UUID, draft/published/archived state, creator, publisher and timestamps. Publishing happens in a transaction: the last published revision is archived, the approved draft becomes published, a `website_publish_events` entry and an existing `audit_logs` entry are written, then Next.js paths are revalidated. A restore never mutates historic content: it creates a fresh private draft from the selected revision. Thus a failed publish leaves the last published page intact.
+
+`website_media` is a metadata registry only: immutable storage key, URL, MIME type, byte count, optional dimensions/duration, alt text and public/draft/archive state. Real file bytes are deliberately not placed in Neon. The intended provider is Vercel Blob with server-side authorisation and verified file signatures/MIME/size limits. The current Vercel project has no `BLOB_READ_WRITE_TOKEN`, so uploads/deletion are disabled rather than simulated. When a Blob Store is explicitly connected, add a server-only upload route with signature inspection, public-asset approval state and a reference check before deletion; do not expose Blob credentials to the browser.
+
+Website Management pages call `requireSuperAdmin` on the server for read, draft, restore and publish operations. There is no client-side-only permission check. Management does not receive website access by default; a future explicit website-review grant can be added without broadening existing project roles. Public visitor rendering never reads drafts, internal portal projects, audit logs or media rows marked non-public.
