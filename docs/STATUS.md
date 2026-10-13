@@ -1,6 +1,6 @@
 # Status
 
-## Phase 4A — deployed with safe fallback; migration and Blob authorisation pending
+## Phase 4A.1 — Website Management activation blocked at safe migration boundary
 
 Production: https://grandharmony.vercel.app
 
@@ -15,6 +15,7 @@ Vercel deployment: `dpl_BwaVek4XB52apmhUPu83xg6LMrDF` (READY; Production domains
 - Added versioned public content schema, metadata-only media registry and publishing/audit event tables in safe additive migration `drizzle/0003_sudden_proteus.sql`.
 - Public pages read only the latest published revision and safely fall back to reviewed source content if website tables are unavailable. Internal project data is never automatically published.
 - Existing models, scenarios, auth, RBAC and project access code are untouched.
+- Website Management no longer accepts arbitrary media URLs when Blob is unavailable. Hero remains on its approved static image; text, controlled alignment/overlay, section copy, Team, Developments, display order and publish state remain independently editable after the website migration. The Media Library explicitly states: `Media uploads are not enabled yet.`
 
 ### Verification completed locally
 
@@ -22,15 +23,16 @@ Vercel deployment: `dpl_BwaVek4XB52apmhUPu83xg6LMrDF` (READY; Production domains
 - Generated migration is additive; it does not alter or delete existing model, scenario, project, user or Auth.js tables.
 - Vercel cloud build for the feature commit reached READY. Public `/` returned HTTP 200 and rendered the approved Hero statement. Unauthenticated `/portal/website` and `/portal/models` resolved to the existing sign-in requirement.
 
-### Blockers / pending owner action
+### Migration verification / blocker
 
-- The execution environment has no direct Neon migration credential. Apply `drizzle/0003_sudden_proteus.sql` (or run `npm run db:migrate` in the already linked repository with the production Vercel environment) before Website Management can read/write its tables. Until then public production stays on the safe fallback website.
+- Production Vercel environment inspection confirms the existing Neon integration is scoped to Grand Harmony. The migration is the additive Drizzle file `drizzle/0003_sudden_proteus.sql`; it creates only `website_revisions`, `website_media`, `website_publish_events` and their enums/indexes/foreign keys. It contains no `DROP`, `TRUNCATE`, `ALTER` of existing tables, reset or `db:push` operation.
+- This execution environment has no Vercel CLI login and therefore cannot obtain the production-only database credential. The attempted production environment pull stopped before creating an `.env.local` file. `npm run db:migrate` cannot be safely run here, so migration, Save Draft, Preview, Publish and Restore have **not** been claimed as passed and no further production deployment is authorised for Phase 4A.1.
 - No Vercel Blob store/token is connected to the Grand Harmony Vercel project. Upload, replacement, media inspection and deletion are intentionally disabled. Connect an approved Blob Store (confirming any pricing/authorisation in Vercel) to enable the hardened upload route in the next narrowly scoped update.
 - Authenticated browser tests for draft isolation, publish/rollback and actual media/video upload require owner acceptance after the migration/storage setup. No unverified claim is made for these flows.
 
 ### Next step
 
-Apply the additive website migration, then open `/portal/website` as Super Admin, create a draft, preview it and publish. Stop after Phase 4A; do not begin financial models or CRM work.
+Apply the additive website migration from an authenticated Vercel-linked machine, then open `/portal/website` as Super Admin, create a draft, preview it and publish. Stop after Phase 4A.1; do not begin financial models or CRM work.
 
 ## Phase 3C — deployed; visual/native browser acceptance pending
 
