@@ -2,6 +2,9 @@
 
 ## Interactive Specification — Portal-native generic model
 
+Feature commit: `8d21ff0167c65ebf7a48489a06672c62c7053f91`.
+Production deployment: `dpl_2f73C4Q3QkZ3HHeiVtiSCXZspVA1` (READY; production domains assigned).
+
 ### Completed in source
 
 - Retired the active Scenario State Test Model from the Library. It is hidden immediately and archived idempotently for Super Admins without deleting historical scenarios or audit rows.
@@ -10,9 +13,11 @@
 - Added per-item Confirmed / To confirm / Optional status, individual HTTPS reference images with labels/source references, Save/Save As/restore/history/archive and a Portal-native A4 print/PDF report.
 - Server-side scenario save/update validates the selected project against access, validates specification state and image URLs, and prevents an unauthorised scenario association from being read, edited or archived.
 
-### Verification pending release
+### Verification completed
 
-- Lint, TypeScript, production build and model/website regression tests are completed before deployment. No database migration is required; model registration and legacy-test archival are idempotent application actions.
+- ESLint, TypeScript, production build, `git diff --check`, existing model/website regression tests and the new Interactive Specification state/policy test passed.
+- Vercel Production build reached READY for `8d21ff0`. Online checks returned HTTP 200 for `/`; unauthenticated `/portal/models` resolved to the existing login page. No model state was exposed.
+- No database migration is required; model registration and legacy-test archival are idempotent application actions.
 - Authenticated browser acceptance for creating an Interactive Specification scenario, assigning a project, saving/reopening and reviewing print/PDF pagination remains pending. No administrator password or production scenario data is used for automation.
 
 ## Phase 4A.2 — Website Management usability and acceptance safeguards
