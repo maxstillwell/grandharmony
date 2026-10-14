@@ -2,6 +2,9 @@
 
 ## Phase 4A.2 — Website Management usability and acceptance safeguards
 
+Feature commit: `c94df83ab3fb194de819e932f133c7ffff47a668`.
+Production deployment: `dpl_3NEoW6JZ1NJBu4fvzKn1dfqG8jJX` (READY; `grandharmony.vercel.app`, `grandharmony.com.au` and `www.grandharmony.com.au` assigned).
+
 ### Completed in source
 
 - Reorganised Super Admin Website Management into a Portal-native workspace with Overview, Hero, Page Content, Team, Developments and Preview & Publish modules. The Portal Sidebar remains in place and no editor opens a new window.
@@ -12,9 +15,10 @@
 - Added unsaved-change browser-exit protection, clear draft/publish failure messages, private preview access and published-version restore-to-draft history. Restore remains non-destructive until a Super Admin explicitly publishes the resulting draft.
 - Hardened server-side validation: only valid structured content, the approved static Hero and approved static gallery assets may be persisted; all save/publish/restore operations continue to require the Super Admin guard. Publishing remains transactional and revalidates public pages.
 
-### Verification pending final deployment
+### Verification completed
 
-- Local lint, TypeScript and production build pass. Website policy/RBAC source regression tests and existing model regression tests are run before release.
+- ESLint, TypeScript, production build, `git diff --check`, the Website Management policy/RBAC regression test and existing model adapter regression test passed.
+- Vercel Production build reached READY for `c94df83`. Online smoke checks returned HTTP 200 for `/`; unauthenticated `/portal/website` resolved to the existing login page, rather than exposing Website Management.
 - Production Neon migration was previously verified by the owner: `website_revisions`, `website_media` and `website_publish_events` exist. This phase does not change the database schema or touch existing accounts, projects or scenarios.
 - Authenticated browser acceptance is intentionally pending: an actual Super Admin must perform Draft → Preview → Publish → Restore using their own session. No password or production session was requested or used, and no test copy has been published to the live website.
 
