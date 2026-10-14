@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { websiteRevisions } from "@/lib/db/schema";
 import { defaultWebsiteContent, type WebsiteContent } from "./types";
@@ -13,7 +13,11 @@ export async function getPublishedWebsiteContent(): Promise<WebsiteContent> {
 
 export async function getWebsiteWorkspace() {
   const db = getDb();
-  const [draft] = await db.select().from(websiteRevisions).where(eq(websiteRevisions.status, "draft")).orderBy(desc(websiteRevisions.updatedAt)).limit(1);
-  const [published] = await db.select().from(websiteRevisions).where(eq(websiteRevisions.status, "published")).orderBy(desc(websiteRevisions.publishedAt)).limit(1);
-  return { draft: draft ? { id: draft.id, content: draft.content as WebsiteContent, updatedAt: draft.updatedAt.toISOString() } : null, published: published ? { id: published.id, content: published.content as WebsiteContent, publishedAt: published.publishedAt?.toISOString() ?? null } : null };
+  const [drafts, releases] = await Promise.all([
+    db.select().from(websiteRevisions).where(eq(websiteRevisions.status, "draft")).orderBy(desc(websiteRevisions.updatedAt)).limit(1),
+    db.select().from(websiteRevisions).where(inArray(websiteRevisions.status, ["published", "archived"])).orderBy(desc(websiteRevisions.publishedAt)).limit(8),
+  ]);
+  const draft = drafts[0]; const published = releases.find(item => item.status === "published");
+  const revision = (item: typeof websiteRevisions.$inferSelect) => ({ id: item.id, content: item.content as WebsiteContent, updatedAt: item.updatedAt.toISOString(), publishedAt: item.publishedAt?.toISOString() ?? null, status: item.status });
+  return { draft: draft ? revision(draft) : null, published: published ? revision(published) : null, releases: releases.map(revision) };
 }

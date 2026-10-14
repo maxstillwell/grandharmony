@@ -51,6 +51,13 @@
 - Added a media metadata registry schema. Vercel Blob upload/replacement/deletion remains blocked until an owner explicitly connects a Blob Store and provides the integration environment variable; this avoids an unapproved paid storage activation.
 - The `0003_sudden_proteus.sql` migration must be applied to Neon before the authenticated management UI becomes operational. Existing public fallback and all Portal/model tables remain unaffected.
 
+## Phase 4A.2 — Website Management acceptance and usability
+
+- Reorganise Website Management into clear Portal-native modules: Overview, Hero, Page Content, Team, Developments, and Preview & Publish.
+- Keep the draft → preview → publish → restore flow private until an explicit publish action. Show a real version/status summary, explicit success/failure feedback and browser-exit unsaved-change protection.
+- Permit only approved existing static images for public Team/Development cards while Blob remains intentionally disconnected; image upload and arbitrary external media URLs remain unavailable.
+- Verify the Super Admin server guard, transactional publish/cache invalidation and existing model regression tests. Final authenticated browser acceptance remains an owner task because no administrator credential is used by automation.
+
 ## Later Phase 2 work — deferred
 
 - Controlled public-content publishing workflow and model registry operations

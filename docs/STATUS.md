@@ -1,5 +1,23 @@
 # Status
 
+## Phase 4A.2 — Website Management usability and acceptance safeguards
+
+### Completed in source
+
+- Reorganised Super Admin Website Management into a Portal-native workspace with Overview, Hero, Page Content, Team, Developments and Preview & Publish modules. The Portal Sidebar remains in place and no editor opens a new window.
+- Added an honest status overview for Published Version, Last Published Date, Draft Changes, Hero Media Status, Media Upload Status and Website Content Status. It reports only revision/content state—no simulated operational metrics.
+- Hero editing now clearly supports headline, subtitle, alignment and overlay settings. Image / Video mode remains visible as a future interface, while the approved static Hero image is safely locked until approved media storage exists.
+- Page copy is editable for About, Experience, Construction Expertise, Expertise, Team introduction, Selected Developments introduction and Contact. Development and Team entries support ordering and explicit publish state; no placeholder people or internal projects are created.
+- Added a controlled selection of already approved static image assets for Team/Development cards. Arbitrary image URLs and all uploads remain unavailable without Blob; image-free cards are fully supported.
+- Added unsaved-change browser-exit protection, clear draft/publish failure messages, private preview access and published-version restore-to-draft history. Restore remains non-destructive until a Super Admin explicitly publishes the resulting draft.
+- Hardened server-side validation: only valid structured content, the approved static Hero and approved static gallery assets may be persisted; all save/publish/restore operations continue to require the Super Admin guard. Publishing remains transactional and revalidates public pages.
+
+### Verification pending final deployment
+
+- Local lint, TypeScript and production build pass. Website policy/RBAC source regression tests and existing model regression tests are run before release.
+- Production Neon migration was previously verified by the owner: `website_revisions`, `website_media` and `website_publish_events` exist. This phase does not change the database schema or touch existing accounts, projects or scenarios.
+- Authenticated browser acceptance is intentionally pending: an actual Super Admin must perform Draft → Preview → Publish → Restore using their own session. No password or production session was requested or used, and no test copy has been published to the live website.
+
 ## Phase 4A.1 — Website Management database migration applied; no-Blob activation deployed
 
 Production: https://grandharmony.vercel.app

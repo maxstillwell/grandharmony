@@ -27,3 +27,9 @@ The public website uses a contemporary Australian architectural direction: charc
 The hero is a cinematic responsive media region with controlled image/video mode, poster URL, alignment and overlay presets. Video must be muted, looped, `playsInline`, include a poster and respect reduced-motion preferences. The currently configured architectural Unsplash image is temporary design imagery and must be replaced with owner-approved licensed media through Website Management before final branding approval.
 
 Website Management deliberately uses structured fields rather than unrestricted HTML/CSS or a page builder. This protects the typography, layout, accessibility and brand. Public cards render only explicitly published Team and Development entries; an empty state remains intentionally complete and does not invent people or projects.
+
+## Phase 4A.2 — Website Management usability
+
+`/portal/website` is a Super Admin workspace within the normal Portal Sidebar, never a separate editor. It groups work into Overview, Hero, Page Content, Team, Developments and Preview & Publish. The overview shows the real revision state (published version/date, current private draft, Hero media, upload availability and published-content state), rather than invented analytics. Edits expose an unsaved-change warning before browser exit and all saving/publishing feedback is explicit.
+
+Media remains intentionally constrained without Vercel Blob. The Hero keeps the approved static image; the Image / Video control explains that video is reserved for a future approved media phase. Team and Development entries can be image-free or select only from a short code-owned list of already approved static assets—there is no arbitrary URL field and no upload affordance. This maintains the public site’s visual consistency and avoids proxying unreviewed external media.

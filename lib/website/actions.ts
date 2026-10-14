@@ -5,11 +5,21 @@ import { revalidatePath } from "next/cache";
 import { requireSuperAdmin } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { auditLogs, websitePublishEvents, websiteRevisions } from "@/lib/db/schema";
-import { defaultWebsiteContent, type WebsiteContent } from "./types";
+import { approvedStaticImageUrls, defaultWebsiteContent, type WebsiteContent } from "./types";
 
 function checkedContent(content: WebsiteContent) {
   if (!content?.hero?.headline?.trim() || !content.hero.subtitle?.trim()) throw new Error("Hero headline and subtitle are required.");
-  if (!Object.values(content.sections ?? {}).every(section => section.heading.length <= 160 && section.body.length <= 5000)) throw new Error("One or more content fields are too long.");
+  if (content.hero.mode !== "image" || content.hero.mediaUrl !== defaultWebsiteContent.hero.mediaUrl || content.hero.posterUrl !== defaultWebsiteContent.hero.posterUrl) {
+    throw new Error("Hero media is managed separately. Keep the approved static image while uploads are unavailable.");
+  }
+  if (!["left", "center"].includes(content.hero.alignment) || !["light", "medium", "strong"].includes(content.hero.overlay)) throw new Error("Hero display settings are invalid.");
+  const requiredSections = ["about", "experience", "construction", "expertise", "team", "developments", "contact"] as const;
+  if (!content.sections || !requiredSections.every(key => {
+    const section = content.sections[key];
+    return typeof section?.heading === "string" && typeof section?.body === "string" && typeof section?.visible === "boolean" && section.heading.length <= 160 && section.body.length <= 5000;
+  })) throw new Error("One or more website content fields are invalid or too long.");
+  if (!Array.isArray(content.projects) || !Array.isArray(content.team) || content.projects.length > 40 || content.team.length > 40) throw new Error("The website gallery has an invalid number of items.");
+  if (![...content.projects, ...content.team].every(item => approvedStaticImageUrls.has(item.imageUrl))) throw new Error("Only approved static images can be used while uploads are unavailable.");
   return content;
 }
 
@@ -42,7 +52,7 @@ export async function publishWebsiteDraft(revisionId: string) {
 export async function restoreWebsiteRevision(revisionId: string) {
   const access = await requireSuperAdmin(); const db = getDb();
   const [source] = await db.select().from(websiteRevisions).where(eq(websiteRevisions.id, revisionId)).limit(1);
-  if (!source) throw new Error("Revision not found.");
+  if (!source || !["published", "archived"].includes(source.status)) throw new Error("Only a published website version can be restored.");
   const [draft] = await db.insert(websiteRevisions).values({ status: "draft", content: source.content, createdByUserId: access.userId }).returning();
   await db.insert(auditLogs).values({ actorUserId: access.userId, action: "website.restore_draft", entityType: "website_revision", entityId: draft.id, metadata: { sourceRevisionId: revisionId } });
   return { id: draft.id, content: draft.content as WebsiteContent, updatedAt: draft.updatedAt.toISOString() };

@@ -8,6 +8,17 @@ export type WebsiteContent = {
   team: Array<{ id: string; name: string; role: string; biography: string; experience: string; imageUrl: string; imageAlt: string; published: boolean; order: number }>;
 };
 
+// These are the only existing, approved static assets that may be selected
+// while uploads are unavailable. Keeping the list in code prevents a content
+// editor from turning the public site into an arbitrary external image proxy.
+export const approvedStaticImageOptions = [
+  { value: "", label: "No image" },
+  { value: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=85", label: "Contemporary residence" },
+  { value: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1800&q=85", label: "Architectural facade" },
+] as const;
+
+export const approvedStaticImageUrls = new Set<string>(approvedStaticImageOptions.map((option) => option.value));
+
 export const defaultWebsiteContent: WebsiteContent = {
   hero: { mode: "image", mediaUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2400&q=85", posterUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2400&q=85", headline: "Built on Experience. Driven by Vision.", subtitle: "Property Development & Investment", alignment: "left", overlay: "medium" },
   sections: {
