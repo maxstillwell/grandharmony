@@ -1,5 +1,20 @@
 # Status
 
+## Interactive Specification — Portal-native generic model
+
+### Completed in source
+
+- Retired the active Scenario State Test Model from the Library. It is hidden immediately and archived idempotently for Super Admins without deleting historical scenarios or audit rows.
+- Changed Development Feasibility from a project-fixed model entry to the generic **Development Feasibility** tool. Existing saved scenarios keep their project association; new scenarios choose their project independently.
+- Added the general **Interactive Specification** model (category: Specifications, version 1.0.0), rebuilt from the owner-supplied Schedule of Finishes & Inclusions source data. It retains all eight supplied sections and their editable items.
+- Added per-item Confirmed / To confirm / Optional status, individual HTTPS reference images with labels/source references, Save/Save As/restore/history/archive and a Portal-native A4 print/PDF report.
+- Server-side scenario save/update validates the selected project against access, validates specification state and image URLs, and prevents an unauthorised scenario association from being read, edited or archived.
+
+### Verification pending release
+
+- Lint, TypeScript, production build and model/website regression tests are completed before deployment. No database migration is required; model registration and legacy-test archival are idempotent application actions.
+- Authenticated browser acceptance for creating an Interactive Specification scenario, assigning a project, saving/reopening and reviewing print/PDF pagination remains pending. No administrator password or production scenario data is used for automation.
+
 ## Phase 4A.2 — Website Management usability and acceptance safeguards
 
 Feature commit: `c94df83ab3fb194de819e932f133c7ffff47a668`.

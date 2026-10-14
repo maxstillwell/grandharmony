@@ -1,9 +1,9 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { PortalAccess } from "@/lib/auth/access";
 import { getDb } from "@/lib/db";
-import { modelRegistry, modelScenarios, modelVersions, scenarioRevisions } from "@/lib/db/schema";
+import { modelRegistry, modelScenarios, modelVersions, projects, scenarioRevisions } from "@/lib/db/schema";
 import { canManageScenario, canUseModel, canViewModel } from "@/lib/models/permissions";
-import { registerFeasibilityModel } from "./register";
+import { registerPlatformModels } from "./register";
 
 export type LibraryModel = {
   id: string;
@@ -20,14 +20,14 @@ export type LibraryModel = {
 };
 
 export async function listAccessibleModels(access: PortalAccess) {
-  if (access.role === "super_admin") await registerFeasibilityModel();
+  if (access.role === "super_admin") await registerPlatformModels();
   const rows = await getDb().select({ id: modelRegistry.id, modelKey: modelRegistry.modelKey, adapterKey: modelRegistry.adapterKey, projectId: modelRegistry.projectId, name: modelRegistry.name, category: modelRegistry.category, description: modelRegistry.description, status: modelRegistry.status, updatedAt: modelRegistry.updatedAt, versionId: modelVersions.id, version: modelVersions.version }).from(modelRegistry).leftJoin(modelVersions, eq(modelVersions.modelId, modelRegistry.id)).orderBy(desc(modelVersions.createdAt));
   const newest = new Map<string, LibraryModel>();
   for (const model of rows as LibraryModel[]) {
     const previous = newest.get(model.id);
     if (!previous) newest.set(model.id, model);
   }
-  return [...newest.values()].filter((model) => canViewModel(access, model));
+  return [...newest.values()].filter((model) => model.modelKey !== "scenario-state-test" && canViewModel(access, model));
 }
 
 export async function getAccessibleModel(access: PortalAccess, modelId: string) {
@@ -39,7 +39,12 @@ export async function getAccessibleModel(access: PortalAccess, modelId: string) 
 export async function listAccessibleScenarios(access: PortalAccess, modelId: string) {
   if (!await getAccessibleModel(access, modelId)) return [];
   const rows = await getDb().select({ id: modelScenarios.id, name: modelScenarios.name, notes: modelScenarios.notes, state: modelScenarios.state, revision: modelScenarios.revision, status: modelScenarios.status, modelVersionId: modelScenarios.modelVersionId, projectId: modelScenarios.projectId, createdByUserId: modelScenarios.createdByUserId, createdAt: modelScenarios.createdAt, updatedAt: modelScenarios.updatedAt }).from(modelScenarios).where(and(eq(modelScenarios.modelId, modelId), eq(modelScenarios.status, "active"))).orderBy(desc(modelScenarios.updatedAt));
-  return rows.filter((scenario) => canManageScenario(access, scenario.createdByUserId));
+  return rows.filter((scenario) => canManageScenario(access, scenario.createdByUserId) && (!scenario.projectId || access.role === "super_admin" || access.projects.some(project => project.id === scenario.projectId)));
+}
+
+export async function listSelectableProjects(access: PortalAccess) {
+  if (access.role !== "super_admin") return access.projects.map(({ id, name }) => ({ id, name }));
+  return getDb().select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.isActive, true));
 }
 
 export async function listScenarioRevisions(access: PortalAccess, scenarioId: string) {

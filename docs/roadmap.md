@@ -58,6 +58,13 @@
 - Permit only approved existing static images for public Team/Development cards while Blob remains intentionally disconnected; image upload and arbitrary external media URLs remain unavailable.
 - Verify the Super Admin server guard, transactional publish/cache invalidation and existing model regression tests. Final authenticated browser acceptance remains an owner task because no administrator credential is used by automation.
 
+## Model Library — generic tools and specifications
+
+- Retire the Phase 3 generic Scenario State Test Model from the active Model Library without deleting historical/audit rows.
+- Register Development Feasibility and Interactive Specification as general reusable library tools; associate a selected project with each saved scenario rather than permanently attaching the model to a project.
+- Render the owner-supplied Interactive Specification as a Portal-native schedule. Each item supports Confirmed, To confirm or Optional status and item-level reference images that print in the generated report.
+- Keep image uploads out of scope without Blob. HTTPS reference URLs are user-provided internal working references and remain subject to licensing and final project approval.
+
 ## Later Phase 2 work — deferred
 
 - Controlled public-content publishing workflow and model registry operations

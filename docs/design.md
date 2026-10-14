@@ -20,6 +20,12 @@ The corporate website retains its existing direction. Portal Library and Project
 
 **Import the model logic, not the old model page design.** Future models should preserve business logic and data structure, but should not preserve legacy standalone page design unless absolutely necessary. Portal components own branding, headings, fonts, colours, controls and layout. A controlled iframe is a temporary bridge only: strip legacy branding, redundant headers/navigation and conflicting save controls, then place it inside the same Portal Shell.
 
+## Generic models and item-level specifications
+
+The Model Library contains reusable tools, not project-branded pages. A model can be a general tool and the scenario toolbar then presents **For which project?** using only projects authorised to that user. The selected project belongs to the saved scenario, while the tool name remains stable (for example, **Development Feasibility**, rather than `700 Project · Development Feasibility`).
+
+The Portal-native Interactive Specification uses a restrained schedule layout: confirmed rows use a calm sage-grey surface, to-confirm rows use a pale warm stone surface, and optional rows use a cool neutral surface. Each individual item can hold reference images rather than relying on a gallery at the bottom of the document. Reference images appear beneath their associated section in A4 print/PDF output with the item and image label; Portal controls do not print. Without Blob, images are HTTPS working references only—no upload control or permanent media-library claim is presented.
+
 ## Phase 4A — corporate website and content controls
 
 The public website uses a contemporary Australian architectural direction: charcoal `#121316`, warm white `#F8F8F6`, pure white, soft stone `#F1F0EC`, muted bronze slate `#6E6A5F` and subtle `#EBE8E1` borders. Editorial serif display headings sit alongside clear modern sans-serif body/UI typography. The visual system is quiet, spacious and professional, with only abstract thin circular/ink-wash-like washes; it must never use literal Chinese ornaments, calligraphy, bright red or decorative motifs.

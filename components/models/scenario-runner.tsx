@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- print reports retain user-managed reference URLs without proxying media. */
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -7,10 +8,11 @@ import type { ModelState } from "@/lib/models/types";
 import { FocusToggle } from "@/components/portal/workspace";
 import type { CanvasHandle, CanvasSnapshot } from "./html-canvas";
 import { FeasibilityCanvas } from "./feasibility-canvas";
+import { SpecificationCanvas } from "./specification-canvas";
 import { ModelShell } from "./model-shell";
 
-type Scenario = { id: string; name: string; notes: string | null; state: ModelState; revision: number; updatedAt: string; modelVersionId: string | null };
-type Model = { id: string; name: string; description: string; version: string | null; versionId: string | null; projectName: string | null; category: string; adapterKey: string | null };
+type Scenario = { id: string; name: string; notes: string | null; state: ModelState; revision: number; updatedAt: string; modelVersionId: string | null; projectId: string | null };
+type Model = { id: string; name: string; description: string; version: string | null; versionId: string | null; projectId: string | null; projectName: string | null; category: string; adapterKey: string | null };
 const empty = { assumptionLabel: "", referenceValue: "", reviewNote: "" };
 const buttonClass = "portal-button";
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 });
@@ -34,14 +36,15 @@ function unpack(state: ModelState): CanvasSnapshot {
   return { state: inputs, results: (__results ?? {}) as Record<string, number> };
 }
 
-export function ScenarioRunner({ model, initialScenarios, initialScenarioId, defaults }: { model: Model; initialScenarios: Scenario[]; initialScenarioId?: string; defaults?: ModelState }) {
+export function ScenarioRunner({ model, initialScenarios, initialScenarioId, defaults, projects }: { model: Model; initialScenarios: Scenario[]; initialScenarioId?: string; defaults?: ModelState; projects: Array<{ id: string; name: string }> }) {
   const selected = initialScenarios.find(s => s.id === initialScenarioId);
   const [scenarios, setScenarios] = useState(initialScenarios);
   const [scenarioId, setScenarioId] = useState<string | null>(selected?.id ?? null);
   const [name, setName] = useState(selected?.name ?? "");
   const [notes, setNotes] = useState(selected?.notes ?? "");
+  const [projectId, setProjectId] = useState(selected?.projectId ?? model.projectId ?? "");
   const [state, setState] = useState<ModelState>(selected?.state ?? empty);
-  const [saved, setSaved] = useState({ state: selected?.state ?? empty, name: selected?.name ?? "", notes: selected?.notes ?? "" });
+  const [saved, setSaved] = useState({ state: selected?.state ?? empty, name: selected?.name ?? "", notes: selected?.notes ?? "", projectId: selected?.projectId ?? model.projectId ?? "" });
   const [results, setResults] = useState<Record<string, number>>({});
   const [sensitivity, setSensitivity] = useState<Array<Record<string, number>>>([]);
   const [orientation, setOrientation] = useState("landscape");
@@ -49,13 +52,15 @@ export function ScenarioRunner({ model, initialScenarios, initialScenarioId, def
   const [printSnapshot, setPrintSnapshot] = useState<PrintSnapshot | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState("workspace");
   const [message, setMessage] = useState("");
-  const [ready, setReady] = useState(model.adapterKey !== "700-feasibility-v1");
+  const [ready, setReady] = useState(false);
   const [history, setHistory] = useState<Awaited<ReturnType<typeof getRevisionHistory>> | null>(null);
   const [pending, startTransition] = useTransition();
   const canvas = useRef<CanvasHandle>(null);
-  const html = model.adapterKey === "700-feasibility-v1";
+  const canvasModel = ["700-feasibility-v1", "interactive-specification-v1"].includes(model.adapterKey ?? "");
+  const feasibility = model.adapterKey === "700-feasibility-v1";
+  const activeProjectName = model.projectName ?? projects.find(project => project.id === projectId)?.name ?? null;
   const current = scenarios.find(s => s.id === scenarioId);
-  const dirty = JSON.stringify({ state, name, notes }) !== JSON.stringify(saved);
+  const dirty = JSON.stringify({ state, name, notes, projectId }) !== JSON.stringify(saved);
   const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
   const actionRef = useRef(pending); actionRef.current = pending;
   useEffect(() => {
@@ -72,19 +77,20 @@ export function ScenarioRunner({ model, initialScenarios, initialScenarioId, def
   async function restore(next: Scenario) {
     if (dirty && !window.confirm("Discard unsaved changes and open this scenario?")) return;
     try {
-      if (html) await canvas.current?.setState(unpack(next.state));
-      const restoredState = html ? unpack(next.state).state : next.state;
-      setScenarioId(next.id); setName(next.name); setNotes(next.notes ?? ""); setState(restoredState); setSaved({ state: restoredState, name: next.name, notes: next.notes ?? "" }); setHistory(null); url(next.id); setMessage("Scenario restored and calculation results verified.");
+      if (canvasModel) await canvas.current?.setState(feasibility ? unpack(next.state) : { state: next.state, results: {} });
+      const restoredState = feasibility ? unpack(next.state).state : next.state;
+      const restoredProjectId = next.projectId ?? model.projectId ?? "";
+      setScenarioId(next.id); setName(next.name); setNotes(next.notes ?? ""); setProjectId(restoredProjectId); setState(restoredState); setSaved({ state: restoredState, name: next.name, notes: next.notes ?? "", projectId: restoredProjectId }); setHistory(null); url(next.id); setMessage(feasibility ? "Scenario restored and calculation results verified." : "Scenario restored.");
       setWorkspaceTab("workspace");
-      if (html) { const snapshot = await canvas.current?.getState(); if (snapshot) setResults(snapshot.results); }
+      if (canvasModel) { const snapshot = await canvas.current?.getState(); if (snapshot) setResults(snapshot.results); }
     } catch (error) { setMessage(String(error)); }
   }
   async function reset() {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
     try {
-      const snapshot = html ? await canvas.current?.reset() : null;
+      const snapshot = canvasModel ? await canvas.current?.reset() : null;
       const nextState = snapshot?.state ?? empty;
-      setScenarioId(null); setName(""); setNotes(""); setState(nextState); setSaved({ state: nextState, name: "", notes: "" }); setResults(snapshot?.results ?? {}); setHistory(null); url(null);
+      setScenarioId(null); setName(""); setNotes(""); setProjectId(model.projectId ?? ""); setState(nextState); setSaved({ state: nextState, name: "", notes: "", projectId: model.projectId ?? "" }); setResults(snapshot?.results ?? {}); setHistory(null); url(null);
     } catch (error) { setMessage(String(error)); }
   }
   function persist(copy = false) {
@@ -93,13 +99,13 @@ export function ScenarioRunner({ model, initialScenarios, initialScenarioId, def
     if (!nextName) { setMessage("Enter a scenario name before saving."); return; }
     startTransition(async () => {
       try {
-        const snapshot = html ? await canvas.current?.getState() : null;
+        const snapshot = canvasModel ? await canvas.current?.getState() : null;
         const nextState = snapshot?.state ?? state;
         const persistedState = snapshot ? { ...nextState, __results: snapshot.results } : nextState;
-        const payload = { modelId: model.id, modelVersionId: model.versionId, name: nextName, notes, state: persistedState };
+        const payload = { modelId: model.id, modelVersionId: model.versionId, projectId: projectId || null, name: nextName, notes, state: persistedState };
         const result = copy || !scenarioId ? await createScenario(payload) : await saveScenario({ ...payload, scenarioId, expectedRevision: current?.revision ?? 0 });
-        const next = { id: result.id, name: nextName, notes, state: persistedState, revision: result.revision, updatedAt: result.updatedAt, modelVersionId: result.modelVersionId };
-        setScenarios(items => [next, ...items.filter(s => s.id !== next.id)]); setScenarioId(next.id); setName(nextName); setState(nextState); setSaved({ state: nextState, name: nextName, notes }); setHistory(null); url(next.id); setMessage(copy ? "Saved as a new scenario. Original preserved." : "Scenario saved.");
+        const next = { id: result.id, name: nextName, notes, state: persistedState, revision: result.revision, updatedAt: result.updatedAt, modelVersionId: result.modelVersionId, projectId: projectId || null };
+        setScenarios(items => [next, ...items.filter(s => s.id !== next.id)]); setScenarioId(next.id); setName(nextName); setState(nextState); setSaved({ state: nextState, name: nextName, notes, projectId }); setHistory(null); url(next.id); setMessage(copy ? "Saved as a new scenario. Original preserved." : "Scenario saved.");
       } catch (error) { setMessage(error instanceof Error ? error.message : "Save failed."); }
     });
   }
@@ -107,7 +113,7 @@ export function ScenarioRunner({ model, initialScenarios, initialScenarioId, def
   function archive() { if (!scenarioId || !window.confirm("Archive this scenario?")) return; startTransition(async () => { try { await archiveScenario(model.id, scenarioId); setScenarios(items => items.filter(s => s.id !== scenarioId)); setScenarioId(null); url(null); setMessage("Scenario archived. State remains on screen; Save As to keep a copy."); } catch (error) { setMessage(String(error)); } }); }
   async function print() {
     try {
-      const printed = html ? await canvas.current?.getPrintData() : null;
+      const printed = canvasModel ? await canvas.current?.getPrintData() : null;
       const next = printed ?? { state, results, sensitivity };
       setResults(next.results); setState(next.state); setSensitivity(next.sensitivity ?? []);
       setPrintSnapshot({ state: next.state, results: next.results, sensitivity: next.sensitivity ?? [] });
@@ -116,15 +122,15 @@ export function ScenarioRunner({ model, initialScenarios, initialScenarioId, def
     } catch (error) { setMessage(String(error)); }
   }
   async function modelReady(snapshot: CanvasSnapshot) {
-    try { if (selected) { await canvas.current?.setState(unpack(selected.state)); const restored = await canvas.current?.getState(); if (restored) { setState(restored.state); setSaved({ state: restored.state, name: selected.name, notes: selected.notes ?? "" }); setResults(restored.results); } } else { setState(snapshot.state); setSaved({ state: snapshot.state, name: "", notes: "" }); setResults(snapshot.results); } setReady(true); } catch (error) { setMessage("Restore failed: " + String(error)); }
+    try { if (selected) { await canvas.current?.setState(feasibility ? unpack(selected.state) : { state: selected.state, results: {} }); const restored = await canvas.current?.getState(); if (restored) { setState(restored.state); setSaved({ state: restored.state, name: selected.name, notes: selected.notes ?? "", projectId: selected.projectId ?? model.projectId ?? "" }); setResults(restored.results); } } else { setState(snapshot.state); setSaved({ state: snapshot.state, name: "", notes: "", projectId: model.projectId ?? "" }); setResults(snapshot.results); } setReady(true); } catch (error) { setMessage("Restore failed: " + String(error)); }
   }
-  return <ModelShell title={model.name} project={model.projectName} version={model.version}><main className="model-runner-surface">
+  return <ModelShell title={model.name} project={activeProjectName} version={model.version}><main className="model-runner-surface">
     <header className="model-toolbar no-print sticky top-0 z-20 border-b border-[#E2E0D9] bg-white px-4 py-3"><div className="flex flex-wrap items-center gap-2"><Link href="/portal/models" className={buttonClass}>← Library</Link><span className="mr-auto text-xs font-medium">{model.name} · v{model.version} / {name || "New Scenario"} {dirty && <span className="ml-2 text-amber-800">Unsaved Changes</span>}</span><FocusToggle /><button className={buttonClass} disabled={pending || !ready} onClick={reset}>New</button><button className={buttonClass} disabled={pending || !ready} onClick={() => persist()}>Save</button><button className={buttonClass} disabled={pending || !ready} onClick={() => persist(true)}>Save As / Duplicate</button><select aria-label="Open scenario" className={buttonClass} disabled={pending || !ready} value={scenarioId ?? ""} onChange={event => { const next = scenarios.find(s => s.id === event.target.value); if (next) void restore(next); }}><option value="">Open Scenario</option>{scenarios.map(s => <option key={s.id} value={s.id}>{s.name} · r{s.revision}</option>)}</select><button className={buttonClass} disabled={!scenarioId || pending} onClick={loadHistory}>Revision History</button><button className={buttonClass} disabled={!ready} onClick={print}>Print / Save as PDF</button></div><p role="status" className="mt-2 text-xs text-[#6E6A5F]">{message || (ready ? "Private scenario · " + (dirty ? "Unsaved changes" : "Saved state") : "Loading model adapter…")}</p></header>
-    <section className="model-editing no-print flex flex-wrap items-end gap-4 border-b border-[#E2E0D9] p-4"><label className="text-xs">Scenario name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} className="ml-2 border p-2" /></label><label className="text-xs">Notes<input value={notes} maxLength={2000} onChange={event => setNotes(event.target.value)} className="ml-2 border p-2" /></label><span className="text-xs">{model.projectName ?? "General tool"} · v{model.version} · {current ? "Revision " + current.revision : "New"}</span>{scenarioId && <button disabled={pending} onClick={archive} className={buttonClass}>Archive</button>}</section>
+    <section className="model-editing no-print flex flex-wrap items-end gap-4 border-b border-[#E2E0D9] p-4"><label className="text-xs">Scenario name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} className="ml-2 border p-2" /></label>{!model.projectId && <label className="text-xs">For which project?<select value={projectId} onChange={event => setProjectId(event.target.value)} className="ml-2 border p-2"><option value="">General / not assigned</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}<label className="text-xs">Notes<input value={notes} maxLength={2000} onChange={event => setNotes(event.target.value)} className="ml-2 border p-2" /></label><span className="text-xs">{activeProjectName ?? "General tool"} · v{model.version} · {current ? "Revision " + current.revision : "New"}</span>{scenarioId && <button disabled={pending} onClick={archive} className={buttonClass}>Archive</button>}</section>
     <div className="model-workspace-tabs no-print" role="tablist" aria-label="Workspace view"><button role="tab" aria-selected={workspaceTab === "workspace"} onClick={() => setWorkspaceTab("workspace")}>Model Workspace</button><button role="tab" aria-selected={workspaceTab === "scenarios"} onClick={() => setWorkspaceTab("scenarios")}>Scenario Library · {scenarios.length}</button><button role="tab" aria-selected={workspaceTab === "history"} disabled={!scenarioId} onClick={loadHistory}>Revision History</button></div>{workspaceTab === "scenarios" && <section className="portal-card no-print mx-5 mt-5"><p className="portal-kicker">Private saved scenarios</p><h2>Scenario Library</h2>{scenarios.map(item => <button key={item.id} onClick={() => restore(item)} className="flex w-full items-center justify-between border-b border-[#e7e4dc] py-4 text-left text-xs"><span>{item.name}</span><span>Revision {item.revision} · Open →</span></button>)}{!scenarios.length && <p className="portal-helper">Save your first scenario to begin this library.</p>}</section>}{workspaceTab === "history" && history && <section className="no-print border-b bg-white p-5"><h2 className="text-sm font-medium">Recent Revision History</h2><ul className="mt-3 space-y-2 text-xs">{history.map(row => <li key={row.id}>Revision {row.revision} · {new Date(row.createdAt).toLocaleString("en-AU")} · {row.notes || "No notes"}</li>)}</ul></section>}
     {current?.modelVersionId && current.modelVersionId !== model.versionId && <p className="no-print bg-amber-50 p-4 text-sm">Older model version: review compatibility and use Save As. The original scenario is preserved.</p>}
-    <style>{`@media print { @page { size: A4 ${orientation}; margin: 12mm; } }`}</style><div className="no-print flex justify-end px-4 py-2"><label className="text-xs">Print layout <select aria-label="Print orientation" className="ml-2 border p-1" value={orientation} onChange={event => setOrientation(event.target.value)}><option value="landscape">A4 Landscape</option><option value="portrait">A4 Portrait</option></select></label></div><div className={`model-editing overflow-x-auto ${workspaceTab !== "workspace" ? "hidden" : ""}`}>{html ? <FeasibilityCanvas ref={canvas} defaults={defaults ?? empty} onReady={modelReady} onChange={snapshot => { setState(snapshot.state); setResults(snapshot.results); }} /> : <section className="m-5 border bg-white p-6"><h1 className="display text-3xl">{model.name}</h1><p className="mt-2 text-sm">{model.description}</p>{Object.entries(state).map(([key, value]) => <label key={key} className="mt-5 block text-xs">{key}<input className="ml-3 border p-2" value={String(value)} onChange={event => setState(current => ({ ...current, [key]: event.target.value }))} /></label>)}</section>}</div>
-    <PrintReport model={model} name={name} notes={notes} printedAt={printedAt} snapshot={printSnapshot ?? { state, results, sensitivity }} />
+    <style>{`@media print { @page { size: A4 ${orientation}; margin: 12mm; } }`}</style><div className="no-print flex justify-end px-4 py-2"><label className="text-xs">Print layout <select aria-label="Print orientation" className="ml-2 border p-1" value={orientation} onChange={event => setOrientation(event.target.value)}><option value="landscape">A4 Landscape</option><option value="portrait">A4 Portrait</option></select></label></div><div className={`model-editing overflow-x-auto ${workspaceTab !== "workspace" ? "hidden" : ""}`}>{feasibility ? <FeasibilityCanvas ref={canvas} defaults={defaults ?? empty} onReady={modelReady} onChange={snapshot => { setState(snapshot.state); setResults(snapshot.results); }} /> : model.adapterKey === "interactive-specification-v1" ? <SpecificationCanvas ref={canvas} onReady={modelReady} onChange={snapshot => { setState(snapshot.state); setResults(snapshot.results); }} /> : null}</div>
+    {feasibility ? <PrintReport model={{ ...model, projectName: activeProjectName }} name={name} notes={notes} printedAt={printedAt} snapshot={printSnapshot ?? { state, results, sensitivity }} /> : <SpecificationPrintReport model={model} projectName={activeProjectName} name={name} notes={notes} printedAt={printedAt} state={(printSnapshot?.state ?? state) as ModelState} />}
   </main></ModelShell>;
 }
 
@@ -143,5 +149,15 @@ function PrintReport({ model, name, notes, printedAt, snapshot }: { model: Model
     <section className="print-report-section print-costs"><div className="print-section-heading"><p className="print-overline">Cost register</p><h2>Development costs</h2></div><table className="print-table"><thead><tr><th>Cost item</th><th>Category</th><th>GST basis</th><th>Input credit</th><th>Amount (AUD)</th></tr></thead><tbody>{costRows.map((row, index) => <tr key={`${String(row.name)}-${index}`}><td>{String(row.name || "Untitled cost")}</td><td>{String(row.group || "—")}</td><td>{row.mode === "gross" ? "Gross incl. GST" : row.mode === "net" ? "Net excl. GST" : "GST not applicable"}</td><td>{row.credit ? "Eligible" : "Not eligible"}</td><td>{money.format(Number(row.amount) || 0)}</td></tr>)}</tbody></table></section>
     <section className="print-report-section print-sensitivity"><div className="print-section-heading"><p className="print-overline">Sensitivity</p><h2>Sales price range</h2></div><div className="print-sensitivity-chart">{reportSensitivity.map(row => <div key={row.price}><strong>{(Number(row.profit || 0) / 1000000).toFixed(1)}M</strong><i style={{ height: `${Math.max(5, Math.abs(Number(row.profit) || 0) / maxProfit * 106)}px`, background: Number(row.profit) >= 0 ? "#83806d" : "#a87970" }} /><span>{(Number(row.price || 0) / 1000000).toFixed(2)}M</span></div>)}</div><table className="print-table"><thead><tr><th>Unit price</th><th>Sales revenue</th><th>Pre-tax profit</th><th>After-tax profit</th></tr></thead><tbody>{reportSensitivity.map(row => <tr key={row.price}><td>{money.format(Number(row.price) || 0)}</td><td>{money.format(Number(row.revenue) || 0)}</td><td>{money.format(Number(row.profit) || 0)}</td><td>{money.format(Number(row.after) || 0)}</td></tr>)}</tbody></table></section>
     <footer className="print-report-footer"><span>Grand Harmony · Thoughtful Investment. Enduring Value.</span><span>Internal decision-support model · Subject to professional review</span></footer>
+  </section>;
+}
+
+function SpecificationPrintReport({ model, projectName, name, notes, printedAt, state }: { model: Model; projectName: string | null; name: string; notes: string; printedAt: string; state: ModelState }) {
+  const sections = Array.isArray(state.sections) ? state.sections as Array<{ id: string; title: string; items: Array<{ id: string; item: string; spec: string; status: string; images: Array<{ id?: string; url: string; label: string }> }> }> : [];
+  return <section className="model-print specification-print-report">
+    <header className="print-report-cover"><div><p className="print-overline">Grand Harmony · Internal specification report</p><h1>{model.name}</h1><p className="print-report-subtitle">A controlled schedule of finishes and inclusions prepared within the Grand Harmony Portal.</p></div><dl><div><dt>Scenario</dt><dd>{name || "Unsaved scenario"}</dd></div><div><dt>For project</dt><dd>{projectName || "General tool"}</dd></div><div><dt>Model version</dt><dd>{model.version || "—"}</dd></div><div><dt>Prepared</dt><dd>{printedAt || "—"}</dd></div></dl></header>
+    {notes && <aside className="print-report-notes"><span>Scenario notes</span><p>{notes}</p></aside>}
+    <section className="print-report-section"><div className="print-section-heading"><p className="print-overline">Schedule</p><h2>Finishes & inclusions</h2></div>{sections.map((section, index) => <article className="specification-print-section" key={section.id}><h3>{String(index + 1).padStart(2, "0")} · {section.title}</h3><table className="print-table"><thead><tr><th>Item</th><th>Standard specification</th><th>Status</th></tr></thead><tbody>{section.items.map(item => <tr key={item.id} className={`spec-row-${item.status}`}><td>{item.item}</td><td>{item.spec}</td><td>{item.status === "确定" ? "Confirmed / 确定" : item.status === "待定" ? "To confirm / 待定" : "Optional / 可选"}</td></tr>)}</tbody></table>{section.items.flatMap(item => item.images.map((image, imageIndex) => <figure className="specification-print-image" key={`${item.id}-${image.id ?? imageIndex}`}><img src={image.url} alt={image.label || "Reference"} /><figcaption><strong>{item.item}</strong><span>{image.label}</span></figcaption></figure>))}</article>)}</section>
+    <footer className="print-report-footer"><span>Grand Harmony · Thoughtful Investment. Enduring Value.</span><span>Reference images are illustrative only; specifications remain subject to final approval.</span></footer>
   </section>;
 }

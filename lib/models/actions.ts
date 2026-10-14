@@ -12,7 +12,7 @@ import { validateModelState } from "./validation";
 import { listScenarioRevisions } from "./data";
 import { randomUUID } from "node:crypto";
 
-type ScenarioInput = { modelId: string; modelVersionId: string | null; name: string; notes?: string; state: ModelState };
+type ScenarioInput = { modelId: string; modelVersionId: string | null; projectId?: string | null; name: string; notes?: string; state: ModelState };
 
 function cleanText(value: string, label: string, maximum: number) {
   const cleaned = value.trim();
@@ -38,17 +38,32 @@ async function authorisedModel(modelId: string) {
   return { access, model };
 }
 
+function scenarioProjectId(access: Awaited<ReturnType<typeof requirePortalAccess>>, model: { projectId: string | null }, requested: string | null | undefined) {
+  if (model.projectId) {
+    if (requested && requested !== model.projectId) throw new Error("This model is fixed to its registered project.");
+    return model.projectId;
+  }
+  if (!requested) return null;
+  if (access.role !== "super_admin" && !access.projects.some(project => project.id === requested)) throw new Error("You are not authorised for the selected project.");
+  return requested;
+}
+
+function canAccessScenarioProject(access: Awaited<ReturnType<typeof requirePortalAccess>>, projectId: string | null) {
+  return !projectId || access.role === "super_admin" || access.projects.some(project => project.id === projectId);
+}
+
 export async function createScenario(input: ScenarioInput) {
   const { access, model } = await authorisedModel(input.modelId);
   const name = cleanText(input.name, "Scenario name", 120);
   const notes = input.notes?.trim().slice(0, 2_000) || null;
   const state = validateModelState(model.adapterKey, validatedState(input.state));
+  const projectId = scenarioProjectId(access, model, input.projectId);
   const version = await activeVersion(model.id);
   if (input.modelVersionId !== (version?.id ?? null)) throw new Error("Model version changed. Reload before creating a scenario.");
   const db = getDb();
   const scenarioId = randomUUID();
   const [created] = await db.batch([
-    db.insert(modelScenarios).values({ id: scenarioId, modelId: model.id, modelVersionId: version?.id ?? null, projectId: model.projectId, name, notes, state, revision: 1, createdByUserId: access.userId, updatedByUserId: access.userId }).returning(),
+    db.insert(modelScenarios).values({ id: scenarioId, modelId: model.id, modelVersionId: version?.id ?? null, projectId, name, notes, state, revision: 1, createdByUserId: access.userId, updatedByUserId: access.userId }).returning(),
     db.insert(scenarioRevisions).values({ scenarioId, revision: 1, modelVersionId: version?.id ?? null, state, notes, savedByUserId: access.userId }),
     db.insert(auditLogs).values({ actorUserId: access.userId, action: "create_model_scenario", entityType: "model_scenario", entityId: scenarioId, metadata: { modelId: model.id, modelVersionId: version?.id ?? null } }),
   ]);
@@ -64,16 +79,17 @@ export async function saveScenario(input: ScenarioInput & { scenarioId: string; 
   const name = cleanText(input.name, "Scenario name", 120);
   const notes = input.notes?.trim().slice(0, 2_000) || null;
   const state = validateModelState(model.adapterKey, validatedState(input.state));
+  const projectId = scenarioProjectId(access, model, input.projectId);
   const db = getDb();
   const scenario = await db.query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, input.scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || scenario.status !== "active" || !canManageScenario(access, scenario.createdByUserId)) throw new Error("This scenario is unavailable for editing.");
+  if (!scenario || scenario.status !== "active" || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for editing.");
   if (input.expectedRevision !== scenario.revision) throw new Error("This scenario changed in another session. Reopen it or Save As before saving.");
   const version = await activeVersion(model.id);
   if (scenario.modelVersionId !== version?.id) throw new Error("This scenario belongs to an older model version. Save As a new scenario after reviewing compatibility; the original is preserved.");
   if (input.modelVersionId !== (version?.id ?? null)) throw new Error("Model version changed. Reload before saving.");
   const revision = scenario.revision + 1;
   const [updatedRows] = await db.batch([
-    db.update(modelScenarios).set({ name, notes, state, revision, updatedByUserId: access.userId, updatedAt: new Date() }).where(and(eq(modelScenarios.id, scenario.id), eq(modelScenarios.revision, scenario.revision))).returning(),
+    db.update(modelScenarios).set({ name, notes, state, projectId, revision, updatedByUserId: access.userId, updatedAt: new Date() }).where(and(eq(modelScenarios.id, scenario.id), eq(modelScenarios.revision, scenario.revision))).returning(),
     db.insert(scenarioRevisions).values({ scenarioId: scenario.id, revision, modelVersionId: scenario.modelVersionId, state, notes, savedByUserId: access.userId }),
     db.insert(auditLogs).values({ actorUserId: access.userId, action: "save_model_scenario", entityType: "model_scenario", entityId: scenario.id, metadata: { revision, modelId: model.id } }),
   ]);
@@ -86,7 +102,7 @@ export async function saveScenario(input: ScenarioInput & { scenarioId: string; 
 export async function getRevisionHistory(modelId: string, scenarioId: string) {
   const { access, model } = await authorisedModel(modelId);
   const scenario = await getDb().query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || !canManageScenario(access, scenario.createdByUserId)) throw new Error("Scenario is unavailable.");
+  if (!scenario || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("Scenario is unavailable.");
   const rows = await listScenarioRevisions(access, scenario.id);
   return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));
 }
@@ -95,7 +111,7 @@ export async function archiveScenario(modelId: string, scenarioId: string) {
   const { access, model } = await authorisedModel(modelId);
   const db = getDb();
   const scenario = await db.query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || !canManageScenario(access, scenario.createdByUserId)) throw new Error("This scenario is unavailable for archiving.");
+  if (!scenario || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for archiving.");
   await db.update(modelScenarios).set({ status: "archived", updatedAt: new Date(), updatedByUserId: access.userId }).where(eq(modelScenarios.id, scenario.id));
   await db.insert(auditLogs).values({ actorUserId: access.userId, action: "archive_model_scenario", entityType: "model_scenario", entityId: scenario.id, metadata: { modelId } });
   revalidatePath(`/portal/models/${model.id}`);
