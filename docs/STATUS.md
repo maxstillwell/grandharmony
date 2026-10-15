@@ -1,5 +1,23 @@
 # Status
 
+## Controlled external specification collaboration — migration pending
+
+### Completed in source
+
+- Added controlled sharing for the Portal-native **Interactive Specification** only. An authorised user can create a 7/30/90-day collaboration link from a saved scenario, copy it once, inspect its status and revoke it in the Model Runner.
+- The recipient uses a polished `/share/[token]` workspace without Portal login. They can change the specification and, on first save, supply their own name, optional email and Scenario name. The server creates a separate Scenario rather than changing the owner’s source; later saves are bound to that browser’s secure HttpOnly session cookie.
+- The scenario owner can see the separate collaborator Scenario in the ordinary Scenario Library. Super Admin/Management behaviour remains unchanged; project scope and model permissions remain server-checked.
+- Added safe additive Drizzle migration `0004_handy_morlun.sql` for `scenario_share_links` and `scenario_share_sessions`. Raw share/session tokens are never stored: Neon receives SHA-256 hashes only. There is no Blob, new paid service or public Portal access.
+
+### Verification completed locally
+
+- ESLint, TypeScript and Production Build pass. The collaboration regression test verifies token hashing, per-link cookie scope, expiry/revocation enforcement points, and that the migration has no destructive statements.
+- The migration has **not** been run against Production from this environment because database credentials are not available here. Until the owner runs `npm run db:migrate` in the Vercel-linked repository, the existing Specification runner continues working and shows that collaboration links await the migration.
+
+### Pending user acceptance
+
+- After migration: create a saved Interactive Specification scenario, create a link, edit/save it from a separate browser profile, then confirm the separately named Scenario appears in the owner’s Scenario Library. Also confirm Revoke makes the link unavailable. No production administrator credential or scenario data was used for automation.
+
 ## Interactive Specification — Portal-native generic model
 
 Feature commit: `8d21ff0167c65ebf7a48489a06672c62c7053f91`.

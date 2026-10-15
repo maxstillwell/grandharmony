@@ -64,6 +64,7 @@
 - Register Development Feasibility and Interactive Specification as general reusable library tools; associate a selected project with each saved scenario rather than permanently attaching the model to a project.
 - Render the owner-supplied Interactive Specification as a Portal-native schedule. Each item supports Confirmed, To confirm or Optional status and item-level reference images that print in the generated report.
 - Keep image uploads out of scope without Blob. HTTPS reference URLs are user-provided internal working references and remain subject to licensing and final project approval.
+- Add controlled external collaboration for Interactive Specification scenarios: a recipient may edit a shared link without Portal login and create/save an independent Scenario. Links are expiry-bound, revocable and server-authorised; the source Scenario is never overwritten. The additive `0004_handy_morlun.sql` migration must be applied before link creation is enabled.
 
 ## Later Phase 2 work — deferred
 

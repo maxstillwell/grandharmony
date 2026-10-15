@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePortalAccess } from "@/lib/auth/guards";
 import { getDb } from "@/lib/db";
 import { auditLogs, modelRegistry, modelScenarios, modelVersions, scenarioRevisions } from "@/lib/db/schema";
-import { getAccessibleModel } from "@/lib/models/data";
-import { canManageScenario } from "@/lib/models/permissions";
+import { canManageScenarioOrShared, getAccessibleModel } from "@/lib/models/data";
 import type { ModelState } from "@/lib/models/types";
 import { validateModelState } from "./validation";
 import { listScenarioRevisions } from "./data";
@@ -82,7 +81,7 @@ export async function saveScenario(input: ScenarioInput & { scenarioId: string; 
   const projectId = scenarioProjectId(access, model, input.projectId);
   const db = getDb();
   const scenario = await db.query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, input.scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || scenario.status !== "active" || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for editing.");
+  if (!scenario || scenario.status !== "active" || !await canManageScenarioOrShared(access, scenario) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for editing.");
   if (input.expectedRevision !== scenario.revision) throw new Error("This scenario changed in another session. Reopen it or Save As before saving.");
   const version = await activeVersion(model.id);
   if (scenario.modelVersionId !== version?.id) throw new Error("This scenario belongs to an older model version. Save As a new scenario after reviewing compatibility; the original is preserved.");
@@ -102,7 +101,7 @@ export async function saveScenario(input: ScenarioInput & { scenarioId: string; 
 export async function getRevisionHistory(modelId: string, scenarioId: string) {
   const { access, model } = await authorisedModel(modelId);
   const scenario = await getDb().query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("Scenario is unavailable.");
+  if (!scenario || !await canManageScenarioOrShared(access, scenario) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("Scenario is unavailable.");
   const rows = await listScenarioRevisions(access, scenario.id);
   return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));
 }
@@ -111,7 +110,7 @@ export async function archiveScenario(modelId: string, scenarioId: string) {
   const { access, model } = await authorisedModel(modelId);
   const db = getDb();
   const scenario = await db.query.modelScenarios.findFirst({ where: and(eq(modelScenarios.id, scenarioId), eq(modelScenarios.modelId, model.id)) });
-  if (!scenario || !canManageScenario(access, scenario.createdByUserId) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for archiving.");
+  if (!scenario || !await canManageScenarioOrShared(access, scenario) || !canAccessScenarioProject(access, scenario.projectId)) throw new Error("This scenario is unavailable for archiving.");
   await db.update(modelScenarios).set({ status: "archived", updatedAt: new Date(), updatedByUserId: access.userId }).where(eq(modelScenarios.id, scenario.id));
   await db.insert(auditLogs).values({ actorUserId: access.userId, action: "archive_model_scenario", entityType: "model_scenario", entityId: scenario.id, metadata: { modelId } });
   revalidatePath(`/portal/models/${model.id}`);
