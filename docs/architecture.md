@@ -104,6 +104,12 @@ No model ID, adapter key, model version ID, schema or saved scenario shape is ch
 5. Reuse the existing server-authorised scenario lifecycle and PDF output. Preserve prior version/state compatibility explicitly.
 6. Compare every key result with the source model, test dynamic rows and JSON round-trip, and verify project/owner isolation. Mark browser checks that cannot be executed as Pending User Acceptance.
 
+## Phase 3D — scenario comparison and richer specifications
+
+`/portal/models/[modelId]/compare` receives its scenario list only through the same server-authorised `listAccessibleScenarios` path as the Runner. It never accepts arbitrary scenario state or IDs from the browser. The comparator is read-only: it compares two scenarios from one model, flags a different `model_version_id` as requiring compatibility review, and never updates either scenario. Financial comparisons separate saved inputs/assumptions from saved calculation results; specification comparisons use stable section/item IDs and report changes to item name, description, Brand, Model Number, Status, Notes, reference images and source links. The browser print report uses the common Grand Harmony report header and page counter.
+
+Interactive Specification state remains JSONB-compatible with all previous eight-section scenarios. `brand`, `modelNumber`, `notes` and `sourceLinks` are optional fields; old saved items are normalised in memory to safe empty values when opened, then only written as part of a normal explicit user save. Existing `item`, `spec`, `status` and image fields retain their original meaning. Add/delete/reorder and status filtering are client interactions inside the adapter, while the existing server action remains the sole authority for saving validated scenario state, project scope, revision history and RBAC.
+
 ## Phase 4A — public content publication surface
 
 The public site reads a server-side `WebsiteContent` document. If there is no successfully published database revision, it renders the reviewed source-controlled default configuration. This means an unavailable or failed content migration never removes the public corporate page.

@@ -1,5 +1,20 @@
 # Status
 
+## Phase 3D — Model Management & Scenario Comparison
+
+### Completed in source
+
+- Added a server-authorised Scenario Comparison page for each active Portal-native model. It compares two saved scenarios from the same model, highlights changed values, supports differences-only display, warns when model versions differ and prints a Grand Harmony comparison report.
+- Financial comparisons separate saved assumptions from stored calculation results. Interactive Specification comparisons cover item name, description, Brand, Model Number, Status, Notes, reference images and source links.
+- Expanded Interactive Specification editing with optional Brand, Model Number, Notes and source links, plus add/delete/reorder, status filtering and an outstanding-decision count. The eight original sections and all old item fields remain compatible.
+- Model Library now supports update-date ordering in addition to model/category/project filtering. General tools remain reusable rather than permanently fixed to a project.
+
+### Verification completed locally
+
+- ESLint, TypeScript, production build, `git diff --check`, existing model calculation/permission regressions, Website Management regression tests and the new scenario-comparison compatibility tests pass.
+- Legacy Interactive Specification state is explicitly tested: old eight-section items open with empty optional Brand/Model/Notes/source-link values while preserving their existing name, description, status and image data.
+- Authenticated browser acceptance for comparison selection, print/PDF pagination and actual saved legacy scenarios remains pending because no administrator session is used in automation.
+
 ## Controlled external specification collaboration — migration pending
 
 ### Completed in source

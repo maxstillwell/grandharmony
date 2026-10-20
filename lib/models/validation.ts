@@ -13,11 +13,16 @@ export function validateModelState(adapter: string | null, value: ModelState): M
       for (const item of record.items) {
         if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid specification item.");
         const entry = item as Record<string, unknown>;
-        if (typeof entry.id !== "string" || typeof entry.item !== "string" || entry.item.length > 400 || typeof entry.spec !== "string" || entry.spec.length > 5000 || !["确定", "待定", "可选"].includes(entry.status as SpecificationStatus) || !Array.isArray(entry.images) || entry.images.length > 8) throw new Error("Invalid specification item.");
+        if (typeof entry.id !== "string" || typeof entry.item !== "string" || entry.item.length > 400 || typeof entry.spec !== "string" || entry.spec.length > 5000 || (entry.brand !== undefined && (typeof entry.brand !== "string" || entry.brand.length > 300)) || (entry.modelNumber !== undefined && (typeof entry.modelNumber !== "string" || entry.modelNumber.length > 300)) || (entry.notes !== undefined && (typeof entry.notes !== "string" || entry.notes.length > 3000)) || !["确定", "待定", "可选"].includes(entry.status as SpecificationStatus) || !Array.isArray(entry.images) || entry.images.length > 8 || (entry.sourceLinks !== undefined && (!Array.isArray(entry.sourceLinks) || entry.sourceLinks.length > 12))) throw new Error("Invalid specification item.");
         for (const image of entry.images) {
           if (!image || typeof image !== "object" || Array.isArray(image)) throw new Error("Invalid reference image.");
           const media = image as Record<string, unknown>;
           if (typeof media.url !== "string" || !/^https:\/\//i.test(media.url) || media.url.length > 2000 || typeof media.label !== "string" || media.label.length > 300 || typeof media.source !== "string" || media.source.length > 2000) throw new Error("Invalid reference image.");
+        }
+        for (const link of entry.sourceLinks ?? []) {
+          if (!link || typeof link !== "object" || Array.isArray(link)) throw new Error("Invalid source link.");
+          const source = link as Record<string, unknown>;
+          if (typeof source.url !== "string" || !/^https:\/\//i.test(source.url) || source.url.length > 2000 || typeof source.label !== "string" || source.label.length > 300) throw new Error("Invalid source link.");
         }
       }
     }

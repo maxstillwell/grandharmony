@@ -66,6 +66,12 @@
 - Keep image uploads out of scope without Blob. HTTPS reference URLs are user-provided internal working references and remain subject to licensing and final project approval.
 - Add controlled external collaboration for Interactive Specification scenarios: a recipient may edit a shared link without Portal login and create/save an independent Scenario. Links are expiry-bound, revocable and server-authorised; the source Scenario is never overwritten. The additive `0004_handy_morlun.sql` migration must be applied before link creation is enabled.
 
+## Phase 3D — Model Management & Scenario Comparison
+
+- Compare two authorised scenarios from the same Model with an optional differences-only view, model-version compatibility warning and printable A4 comparison report.
+- Extend Interactive Specification items with Brand, Model Number, Notes and item-level source links while retaining the original eight-section state structure, images and status choices. Add item filtering, outstanding-decision count and item reordering.
+- Improve Model Library filtering with project-aware general tools and update-date ordering. No CRM, Project Management module, model database migration or data deletion is included.
+
 ## Later Phase 2 work — deferred
 
 - Controlled public-content publishing workflow and model registry operations
