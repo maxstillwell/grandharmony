@@ -15,17 +15,6 @@ test('owner specification imports as editable item-level reference state', () =>
   assert.equal(validateModelState('interactive-specification-v1', state), state);
 });
 
-test('Waverley One brochure additions are represented without changing the eight-section structure', () => {
-  const kitchen = specificationDefaults.sections.find(section => section.title === 'Kitchen');
-  const bathroom = specificationDefaults.sections.find(section => section.title === 'Bathrooms, Ensuites and Powder Rooms');
-  const external = specificationDefaults.sections.find(section => section.title === 'Garage, Façade and External Works');
-  assert.equal(specificationDefaults.sections.length, 8);
-  assert.match(kitchen.items.find(item => item.item === 'Appliance brand').spec, /Smeg/);
-  assert.match(kitchen.items.find(item => item.item === 'Dishwasher').spec, /integrated Smeg/);
-  assert.match(bathroom.items.find(item => item.item === 'Shower niche').spec, /Inbuilt/);
-  assert.match(external.items.find(item => item.item === 'Roof').spec, /COLORBOND/);
-});
-
 test('specification status and reference image validation reject unsafe state', () => {
   const state = structuredClone(specificationDefaults);
   state.sections[0].items[0].status = 'unknown';

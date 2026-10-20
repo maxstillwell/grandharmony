@@ -12,8 +12,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-1-item-1",
           "item": "Internal ceiling height",
-          "spec": "2.7 m to main living floor; 2.55 m to first floor",
-          "status": "确定",
+          "spec": "Approx. 2,700 mm",
+          "status": "待定",
           "images": [
             {
               "url": "https://www.datocms-assets.com/108926/1707739209-00859009_img_03.jpg",
@@ -25,8 +25,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-1-item-2",
           "item": "Walls and ceilings",
-          "spec": "Premium 3-coat wall paint system and 2-coat ceiling paint system",
-          "status": "确定",
+          "spec": "Painted plasterboard, contemporary neutral finish",
+          "status": "待定",
           "images": []
         },
         {
@@ -40,7 +40,7 @@ export const specificationDefaults: SpecificationState = {
           "id": "section-1-item-4",
           "item": "Internal door height",
           "spec": "Indicative 2,400 mm",
-          "status": "确定",
+          "status": "待定",
           "images": []
         },
         {
@@ -67,22 +67,15 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-1-item-8",
           "item": "Internal paint",
-          "spec": "Two curated neutral schemes: Glow or Ember",
-          "status": "确定",
+          "spec": "Selected neutral colour scheme",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-1-item-9",
           "item": "Built-in wardrobes",
-          "spec": "One melamine shelf and hanging rail; linen includes 3 shelves where applicable",
-          "status": "确定",
-          "images": []
-        },
-        {
-          "id": "section-1-item-10",
-          "item": "Laundry cabinetry",
-          "spec": "Base cabinetry with matching kitchen/bathroom benchtop where shown on plans; otherwise freestanding metal laundry trough with cabinet",
-          "status": "确定",
+          "spec": "As shown on approved plans",
+          "status": "待定",
           "images": []
         }
       ]
@@ -94,8 +87,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-2-item-1",
           "item": "Cabinetry",
-          "spec": "Australian-made kitchen with feature cabinetry from the curated scheme",
-          "status": "确定",
+          "spec": "Woodgrain laminate or 2-pack finish",
+          "status": "待定",
           "images": [
             {
               "url": "https://images.zenu.com.au/1200-min/7g0h3ai96r5929hod41ekw22pvg1gjzl.jpg",
@@ -107,29 +100,29 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-2-item-2",
           "item": "Cabinet design",
-          "spec": "Finger-pull cabinetry with soft-close cupboards and drawers",
+          "spec": "Contemporary handleless design",
           "status": "确定",
           "images": []
         },
         {
           "id": "section-2-item-3",
           "item": "Benchtop",
-          "spec": "Zenith Premium Range: 20 mm in 2/3 bedroom homes; 40 mm in 4 bedroom homes",
-          "status": "确定",
+          "spec": "Manufactured stone-look / mineral-surface benchtop",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-2-item-4",
           "item": "Benchtop edge",
-          "spec": "Contemporary waterfall island where applicable; alternative colours and feature cladding are upgrades",
-          "status": "确定",
+          "spec": "Standard profile, thickness to design",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-2-item-5",
           "item": "Splashback",
-          "spec": "Feature tile splashback; matching benchtop is an upgrade",
-          "status": "确定",
+          "spec": "Selected standard splashback",
+          "status": "待定",
           "images": []
         },
         {
@@ -149,36 +142,36 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-2-item-8",
           "item": "Rangehood",
-          "spec": "European Smeg rangehood; 600 mm in 2/3 bedroom homes and 900 mm in 4 bedroom homes",
-          "status": "确定",
+          "spec": "Rangehood",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-2-item-9",
           "item": "Dishwasher",
-          "spec": "Fully integrated Smeg dishwasher",
+          "spec": "Dishwasher",
           "status": "确定",
           "images": []
         },
         {
           "id": "section-2-item-10",
           "item": "Appliance brand",
-          "spec": "European Smeg appliances",
-          "status": "确定",
+          "spec": "Midea or comparable brand discussed",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-2-item-11",
           "item": "Sink and mixer",
-          "spec": "Undermount double-bowl stainless-steel sink with brushed-nickel swivel-spout mixer; pull-out mixer upgrade available",
-          "status": "确定",
+          "spec": "Kitchen sink and mixer",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-2-item-12",
           "item": "Pantry / storage",
-          "spec": "Four melamine shelves to pantry where applicable",
-          "status": "确定",
+          "spec": "As shown on kitchen joinery plans",
+          "status": "待定",
           "images": []
         },
         {
@@ -205,8 +198,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-2-item-16",
           "item": "Waterfall benchtop",
-          "spec": "Contemporary waterfall island where applicable; alternative colours and feature cladding are upgrades",
-          "status": "确定",
+          "spec": "Not included",
+          "status": "可选",
           "images": []
         }
       ]
@@ -238,7 +231,7 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-3-item-3",
           "item": "Second floor bedrooms and circulation",
-          "spec": "Choice of loop-pile wool or twist-pile nylon carpet",
+          "spec": "Nylon carpet",
           "status": "确定",
           "images": []
         },
@@ -259,15 +252,15 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-3-item-6",
           "item": "Carpet",
-          "spec": "Option between loop-pile wool or twist-pile nylon carpet",
-          "status": "确定",
+          "spec": "Durable nylon carpet",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-3-item-7",
           "item": "Ground-to-first staircase",
-          "spec": "Contemporary timber stair balustrade with wrought-iron balusters where applicable",
-          "status": "确定",
+          "spec": "Timber or carpet finish",
+          "status": "待定",
           "images": []
         },
         {
@@ -293,8 +286,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-4-item-1",
           "item": "Wall tiling",
-          "spec": "Oversized floor-to-ceiling tiles with a feature tile wall",
-          "status": "确定",
+          "spec": "Floor-to-ceiling tiling to bathrooms and ensuites",
+          "status": "待定",
           "images": [
             {
               "url": "https://website-static.ljhooker.com/images/10734/0008880604.jpg?r=326826",
@@ -306,22 +299,22 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-4-item-2",
           "item": "Floor tiling",
-          "spec": "Contemporary oversized tiles",
+          "spec": "Selected standard ceramic or porcelain tiles",
           "status": "确定",
           "images": []
         },
         {
           "id": "section-4-item-3",
           "item": "Tile size",
-          "spec": "Oversized tile range from the selected Glow or Ember scheme",
-          "status": "确定",
+          "spec": "Standard tile range, approximately 300–600 mm dimensions",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-4-item-4",
           "item": "Feature wall",
-          "spec": "Feature tile wall to bathroom/ensuite",
-          "status": "确定",
+          "spec": "One selected wall may use a different standard tile finish",
+          "status": "待定",
           "images": []
         },
         {
@@ -341,15 +334,15 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-4-item-7",
           "item": "Shower fittings / mixers",
-          "spec": "Overhead rose and hand-held shower; brushed-nickel bathroom fittings",
-          "status": "确定",
+          "spec": "Selected standard range",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-4-item-8",
           "item": "Vanity, basin and mirror",
-          "spec": "Floating timber-look laminate drawer vanity, designer basin/tapware and two-door arch shaving cabinet with adjustable shelves",
-          "status": "确定",
+          "spec": "Selected standard range",
+          "status": "待定",
           "images": []
         },
         {
@@ -362,8 +355,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-4-item-10",
           "item": "Shower niche",
-          "spec": "Inbuilt shower niche",
-          "status": "确定",
+          "spec": "Not included",
+          "status": "可选",
           "images": []
         },
         {
@@ -376,15 +369,15 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-4-item-12",
           "item": "Decorative bathroom lighting",
-          "spec": "Feature mood lighting included",
-          "status": "确定",
+          "spec": "Not included",
+          "status": "可选",
           "images": []
         },
         {
           "id": "section-4-item-13",
           "item": "Bath (where shown)",
-          "spec": "Back-to-wall freestanding bath where shown on plans",
-          "status": "确定",
+          "spec": "As per approved plans",
+          "status": "待定",
           "images": []
         }
       ]
@@ -396,7 +389,7 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-5-item-1",
           "item": "Heating and cooling",
-          "spec": "Reverse-cycle split system to main living and master bedroom; additional systems are an upgrade",
+          "spec": "Reverse-cycle split-system air conditioning",
           "status": "确定",
           "images": [
             {
@@ -409,22 +402,15 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-5-item-2",
           "item": "Air-conditioner quantity",
-          "spec": "Main living and master bedroom included; option to upgrade additional split systems",
-          "status": "确定",
-          "images": []
-        },
-        {
-          "id": "section-5-item-2a",
-          "item": "Bedroom heating",
-          "spec": "Heating panels to all bedrooms and second living where applicable",
-          "status": "确定",
+          "spec": "Up to three units per dwelling discussed",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-5-item-3",
           "item": "General internal lighting",
           "spec": "LED downlights",
-          "status": "确定",
+          "status": "待定",
           "images": []
         },
         {
@@ -444,29 +430,29 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-5-item-6",
           "item": "Kitchen cabinet feature lighting",
-          "spec": "LED strip lighting to underside of overhead cabinets and feature lighting over island bench where applicable",
-          "status": "确定",
+          "spec": "Not included",
+          "status": "可选",
           "images": []
         },
         {
           "id": "section-5-item-7",
           "item": "Power, TV and data points",
-          "spec": "TV, phone and data outlets",
-          "status": "确定",
+          "spec": "As per final electrical layout",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-5-item-8",
           "item": "Smoke alarms",
           "spec": "To applicable requirements",
-          "status": "确定",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-5-item-9",
           "item": "External lighting",
-          "spec": "Exterior lighting included",
-          "status": "确定",
+          "spec": "As per final electrical layout",
+          "status": "待定",
           "images": []
         }
       ]
@@ -491,8 +477,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-6-item-2",
           "item": "Windows",
-          "spec": "Contemporary framed glazing; flyscreens to all openable windows are an upgrade",
-          "status": "确定",
+          "spec": "Contemporary framed glazing",
+          "status": "待定",
           "images": []
         },
         {
@@ -500,13 +486,6 @@ export const specificationDefaults: SpecificationState = {
           "item": "Window glazing",
           "spec": "To approved thermal/acoustic design",
           "status": "待定",
-          "images": []
-        },
-        {
-          "id": "section-6-item-2a",
-          "item": "Window furnishings",
-          "spec": "Blinds and/or sheer curtains available as an upgrade",
-          "status": "可选",
           "images": []
         },
         {
@@ -559,8 +538,8 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-7-item-3",
           "item": "External façade",
-          "spec": "Timeless architectural façade as per plans",
-          "status": "确定",
+          "spec": "Rendered lightweight cladding system",
+          "status": "待定",
           "images": []
         },
         {
@@ -573,36 +552,29 @@ export const specificationDefaults: SpecificationState = {
         {
           "id": "section-7-item-5",
           "item": "Fencing",
-          "spec": "Side and boundary fencing where applicable",
-          "status": "确定",
+          "spec": "Standard fencing with possible selected feature elements",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-7-item-6",
           "item": "Landscaping",
-          "spec": "Front and rear landscaping including paths, mulch and planting",
-          "status": "确定",
+          "spec": "As per approved landscape plans",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-7-item-7",
           "item": "Driveway and paths",
-          "spec": "Exposed aggregate concrete driveway as per plan; landscaped paths included",
-          "status": "确定",
+          "spec": "As per approved plans",
+          "status": "待定",
           "images": []
         },
         {
           "id": "section-7-item-8",
           "item": "Letterbox and clothesline",
-          "spec": "Parcel post-box and clothesline included",
-          "status": "确定",
-          "images": []
-        },
-        {
-          "id": "section-7-item-9",
-          "item": "Roof",
-          "spec": "COLORBOND® roof",
-          "status": "确定",
+          "spec": "To be confirmed",
+          "status": "待定",
           "images": []
         }
       ]

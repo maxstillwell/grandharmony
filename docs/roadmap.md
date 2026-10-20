@@ -70,7 +70,6 @@
 
 - Compare two authorised scenarios from the same Model with an optional differences-only view, model-version compatibility warning and printable A4 comparison report.
 - Keep Interactive Specification deliberately compact: Item, Description, Status and item-level reference images/source URL. Retain the original eight-section state structure, add item filtering, outstanding-decision count and item reordering without exposing unnecessary metadata fields.
-- Permit reviewed default-template enrichments from owner-supplied finishes literature without altering existing saved Scenario decision records. Confirm applicability to the target project before issuing a Specification externally.
 - Improve Model Library filtering with project-aware general tools and update-date ordering. No CRM, Project Management module, model database migration or data deletion is included.
 
 ## Later Phase 2 work — deferred

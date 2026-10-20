@@ -110,8 +110,6 @@ No model ID, adapter key, model version ID, schema or saved scenario shape is ch
 
 Interactive Specification state remains JSONB-compatible with all previous eight-section scenarios. The working editor deliberately remains compact: Item, Description, Status and item-level reference images (including each image's source URL) are the active fields. Previously stored optional metadata is preserved in JSONB but intentionally not rendered or required. Existing `item`, `spec`, `status` and image fields retain their original meaning. Add/delete/reorder and status filtering are client interactions inside the adapter, while the existing server action remains the sole authority for saving validated scenario state, project scope, revision history and RBAC.
 
-Default specification content may be enriched from owner-supplied project literature only where an inclusion is stated explicitly. This updates the default used for a new Scenario; it never silently rewrites an existing saved Scenario, because saved Scenario state is a controlled decision record. The Waverley One finishes brochure has been used as a documented reference update for the current default template; its project-specific inclusions remain subject to the relevant plans, apartment/townhome type and upgrade wording in that brochure.
-
 ## Phase 4A — public content publication surface
 
 The public site reads a server-side `WebsiteContent` document. If there is no successfully published database revision, it renders the reviewed source-controlled default configuration. This means an unavailable or failed content migration never removes the public corporate page.

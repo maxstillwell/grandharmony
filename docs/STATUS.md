@@ -1,17 +1,5 @@
 # Status
 
-## Specification reference update — Waverley One finishes brochure
-
-### Completed in source
-
-- Audited the owner-supplied Waverley One finishes, fixtures and upgrades brochure and added only explicit brochure inclusions to the **default** Interactive Specification: two curated schemes, kitchen cabinetry/benchtop/splashback, European Smeg appliances, integrated dishwasher, sink/mixer, pantry/wardrobe shelving, laundry cabinetry, flooring and staircase details, bathroom vanity/shower/niche/lighting, heating/cooling, windows, exterior works and COLORBOND® roof.
-- Corrected conflicting default template text where the brochure is explicit, including Midea/comparable appliances, kitchen lighting, shower niche, bathroom mood lighting, driveway, letterbox/clothesline and exterior landscaping.
-- The state remains at eight sections. Existing saved Scenarios are intentionally not automatically altered; create a new Scenario to start from the reviewed brochure-enriched template, or update an existing Scenario manually after review.
-
-### Verification pending for release
-
-- Validate the template state, existing Scenario compatibility, TypeScript, ESLint and production build before deployment.
-
 ## Phase 3D — Model Management & Scenario Comparison
 
 ### Completed in source
