@@ -69,7 +69,7 @@
 ## Phase 3D — Model Management & Scenario Comparison
 
 - Compare two authorised scenarios from the same Model with an optional differences-only view, model-version compatibility warning and printable A4 comparison report.
-- Extend Interactive Specification items with Brand, Model Number, Notes and item-level source links while retaining the original eight-section state structure, images and status choices. Add item filtering, outstanding-decision count and item reordering.
+- Keep Interactive Specification deliberately compact: Item, Description, Status and item-level reference images/source URL. Retain the original eight-section state structure, add item filtering, outstanding-decision count and item reordering without exposing unnecessary metadata fields.
 - Improve Model Library filtering with project-aware general tools and update-date ordering. No CRM, Project Management module, model database migration or data deletion is included.
 
 ## Later Phase 2 work — deferred

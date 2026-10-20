@@ -15,13 +15,13 @@ test('legacy specification state gains optional item fields without data loss', 
   assert.equal(normalized.sections[0].items[0].spec, 'Electric');
 });
 
-test('specification comparison reports item fields, media and outstanding status changes', () => {
+test('specification comparison reports the streamlined item, description, status and media changes', () => {
   const a = { sections: [{ id: 's', title: 'Kitchen', items: [{ id: 'i', item: 'Oven', spec: 'Electric', brand: 'Brand A', modelNumber: 'A1', notes: '', status: '待定', images: [], sourceLinks: [] }] }] };
   const b = { sections: [{ id: 's', title: 'Kitchen', items: [{ id: 'i', item: 'Oven', spec: 'Induction', brand: 'Brand B', modelNumber: 'B2', notes: 'Confirm finish', status: '确定', images: [{ url: 'https://example.test/oven.jpg', label: 'Oven', source: 'https://example.test' }], sourceLinks: [{ url: 'https://example.test/spec', label: 'Specification' }] }] }] };
   const rows = compareScenarioStates('interactive-specification-v1', a, b);
   assert.ok(rows.some((row) => row.label === 'Oven · Status' && row.changed));
   assert.ok(rows.some((row) => row.label === 'Oven · Reference images' && row.changed));
-  assert.ok(rows.some((row) => row.label === 'Oven · Source links' && row.changed));
+  assert.ok(!rows.some((row) => row.label === 'Oven · Brand'));
 });
 
 test('financial comparison separates inputs from stored calculation results', () => {

@@ -5,8 +5,8 @@
 ### Completed in source
 
 - Added a server-authorised Scenario Comparison page for each active Portal-native model. It compares two saved scenarios from the same model, highlights changed values, supports differences-only display, warns when model versions differ and prints a Grand Harmony comparison report.
-- Financial comparisons separate saved assumptions from stored calculation results. Interactive Specification comparisons cover item name, description, Brand, Model Number, Status, Notes, reference images and source links.
-- Expanded Interactive Specification editing with optional Brand, Model Number, Notes and source links, plus add/delete/reorder, status filtering and an outstanding-decision count. The eight original sections and all old item fields remain compatible.
+- Financial comparisons separate saved assumptions from stored calculation results. Interactive Specification comparisons cover Item, Description, Status and reference images.
+- Restored Interactive Specification to a compact editor: Item, Description, Status and reference images with each image's Source URL. Add/delete/reorder, status filtering and an outstanding-decision count remain. The eight original sections and all saved item data remain compatible; optional metadata is retained but not shown.
 - Model Library now supports update-date ordering in addition to model/category/project filtering. General tools remain reusable rather than permanently fixed to a project.
 
 ### Verification completed locally
