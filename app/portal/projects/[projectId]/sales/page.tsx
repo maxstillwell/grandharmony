@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePortalAccess } from "@/lib/auth/guards";
 
-export const metadata = { title: "Morack Sales Management | Grand Harmony" };
+export const metadata = { title: "Golfview Sales Management | Grand Harmony" };
 
-export default async function MorackSalesManagement({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function GolfviewSalesManagement({ params }: { params: Promise<{ projectId: string }> }) {
   const access = await requirePortalAccess();
   const { projectId } = await params;
   const project = access.projects.find((item) => item.id === projectId);
@@ -14,7 +14,7 @@ export default async function MorackSalesManagement({ params }: { params: Promis
   if (!["super_admin", "management", "project_manager", "sales_manager"].includes(access.role)) notFound();
   return <main className="portal-page"><div className="portal-page-inner">
     <header className="portal-page-title">
-      <p className="portal-kicker">Grand Harmony / Morack</p>
+      <p className="portal-kicker">Grand Harmony / Golfview</p>
       <h1>Sales Management</h1>
       <p>700 Project · Inventory, publishing and customer management workspace.</p>
     </header>
