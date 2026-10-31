@@ -1,0 +1,11 @@
+{
+  "passed": 4,
+  "tests": [
+    "Actual B source matcher report identifies first-floor-only geometry change; seven Demo versions include six original assets, no real changes",
+    "Source-change review/approval and Demo first-floor promotion preserve ground/second pointers, real media scope, all inventory and price bytes",
+    "Mobile source comparison and decisions remain usable; no page errors or document overflow",
+    "Portal manifest dry-run and explicit commit controls register six genuine draft media versions, with no current pointer or inventory/price change; original First Floor preview works"
+  ],
+  "pageErrors": [],
+  "scope": "Isolated PGlite with real services and original six B assets; synthetic source change explicitly Demo-only"
+}

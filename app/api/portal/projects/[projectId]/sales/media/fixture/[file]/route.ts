@@ -1,3 +1,4 @@
+import { fixtureHashes } from "@/lib/sales/media-domain";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { requirePortalAccess } from "@/lib/auth/guards";
@@ -16,7 +17,9 @@ export async function GET(
     assertSales(access, projectId, "inventory.edit");
     if (
       new URL(request.url).searchParams.get("demo") !== "1" ||
-      !["a.svg", "b.svg"].includes(file)
+      !Object.keys(fixtureHashes)
+        .map((k) => k + ".svg")
+        .includes(file)
     )
       throw Error("Test fixture unavailable");
     await resolveSalesScope(getSalesDb(), access, projectId, true);
@@ -28,7 +31,8 @@ export async function GET(
           "Cache-Control": "private, no-store",
           "X-Robots-Tag": "noindex, nofollow",
           "X-Content-Type-Options": "nosniff",
-          "Content-Security-Policy": "default-src 'none'; sandbox",
+          "Content-Security-Policy":
+            "default-src 'none'; style-src 'unsafe-inline'; font-src data:; sandbox allow-same-origin",
         },
       },
     );

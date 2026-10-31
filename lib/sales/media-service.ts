@@ -1,3 +1,9 @@
+import {
+  bundledSource,
+  bundledPreview,
+  unit02SourcePackage,
+  sourceFloorEvidence,
+} from "./bundled-media";
 import { createHash } from "node:crypto";
 import { and, eq, desc, inArray, sql } from "drizzle-orm";
 import type { PortalAccess } from "../auth/access";
@@ -48,11 +54,20 @@ export function createResidenceMediaService(
         ),
       );
     return {
+      sourceSampleAvailable:
+        (
+          await db
+            .select()
+            .from(s.salesProjects)
+            .where(eq(s.salesProjects.projectId, pid))
+        )[0]?.publicKey === "golfview",
       versions: versions.map((v) => ({
         ...v,
         previewUrl: v.synthetic
-          ? `/api/portal/projects/${pid}/sales/media/fixture/${v.url.slice(-1)}.svg?demo=1`
-          : v.url,
+          ? `/api/portal/projects/${pid}/sales/media/fixture/${v.url.slice(8)}.svg?demo=1`
+          : bundledPreview(v)
+            ? `/api/portal/projects/${pid}/sales/media/assets/${v.sha256}${scopeKey === "real" ? "" : "?demo=1"}`
+            : v.url,
       })),
       current,
       publicPublicationEnabled:
@@ -150,7 +165,10 @@ export function createResidenceMediaService(
           const registeredUrl = mediaUrl(a.url, a.synthetic === true);
           if (
             a.synthetic &&
-            a.sha256 !== fixtureHashes[registeredUrl.slice(-1) as "a" | "b"]
+            a.sha256 !==
+              fixtureHashes[
+                registeredUrl.slice(8) as keyof typeof fixtureHashes
+              ]
           )
             throw Error("Fixture checksum mismatch.");
           if (
@@ -272,12 +290,33 @@ export function createResidenceMediaService(
           throw Error("A supported MIME and SHA-256 are required.");
         if (
           synthetic &&
-          ((url !== "fixture:a" && url !== "fixture:b") ||
-            sha256 !== fixtureHashes[url.slice(-1) as "a" | "b"])
+          (!url.startsWith("fixture:") ||
+            sha256 !==
+              fixtureHashes[url.slice(8) as keyof typeof fixtureHashes])
         )
           throw Error(
             "Synthetic fixture checksum does not match the bundled abstract test asset.",
           );
+        const bound = bundledSource(url);
+        if (bound) {
+          const [settings] = await tx
+            .select()
+            .from(s.salesProjects)
+            .where(eq(s.salesProjects.projectId, pid));
+          if (
+            settings?.publicKey !== "golfview" ||
+            Number(unit.number) !== 2 ||
+            bound.floorId !== r.floorId ||
+            bound.slot !== r.slot ||
+            bound.sha256 !== sha256 ||
+            bound.mime !== mime ||
+            bound.kind !== r.kind ||
+            bound.sourceRevision !== r.sourceRevision
+          )
+            throw Error(
+              "Bundled source asset does not match this canonical residence, floor or source revision.",
+            );
+        }
         const rows = await tx
           .select()
           .from(s.salesResidenceMedia)
@@ -338,6 +377,78 @@ export function createResidenceMediaService(
           synthetic,
         });
         return v.id;
+      }
+      if (operation === "seedUnit02Demo") {
+        if (scopeKey === "real")
+          throw Error("Source change test is Demo-only.");
+        const [unit] = await tx
+          .select()
+          .from(s.salesUnits)
+          .where(
+            and(
+              eq(s.salesUnits.projectId, pid),
+              eq(s.salesUnits.id, String(r.unitId)),
+            ),
+          );
+        const [settings] = await tx
+          .select()
+          .from(s.salesProjects)
+          .where(eq(s.salesProjects.projectId, pid));
+        if (
+          !unit ||
+          Number(unit.number) !== 2 ||
+          settings?.publicKey !== "golfview"
+        )
+          throw Error(
+            "Select Golfview Residence 02 for the source package demonstration.",
+          );
+        if (
+          (
+            await tx
+              .select()
+              .from(s.salesResidenceMedia)
+              .where(and(scope(pid), eq(s.salesResidenceMedia.unitId, unit.id)))
+          ).length
+        )
+          throw Error(
+            "This Demo residence already has media. Use its versions or reset your own Demo first.",
+          );
+        const service = createResidenceMediaService(
+          tx as unknown as SalesDb,
+          scopeKey,
+        );
+        let first: string | null = null;
+        for (const asset of unit02SourcePackage.manifest.assets) {
+          const id = await service.execute(a, pid, "register", {
+            ...asset,
+            unitId: unit.id,
+          });
+          if (asset.floorId === "first") first = String(id);
+        }
+        const firstAsset = unit02SourcePackage.manifest.assets.find(
+          (a) => a.floorId === "first",
+        )!;
+        await service.execute(a, pid, "register", {
+          ...firstAsset,
+          bytes: null,
+          unitId: unit.id,
+          previousId: first,
+          url: "fixture:unit02-first-change",
+          sha256: fixtureHashes["unit02-first-change"],
+          sourceRevision: "TEST first-floor wall +150mm — NOT REAL REVISION",
+          sourceDocument:
+            "Controlled copy of genuine B source; isolated Demo; original source unchanged",
+          title: "TEST ONLY — first-floor source change, not real architecture",
+          synthetic: true,
+          changeStatus: "manual-review",
+          comparisonEvidence: sourceFloorEvidence("first"),
+        });
+        return {
+          baselineAssets: 6,
+          changedFloors: ["first"],
+          unchangedFloors: ["ground", "second"],
+          testOnly: true,
+        };
       }
       if (operation === "seedDemo") {
         if (scopeKey === "real")

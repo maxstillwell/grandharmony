@@ -1,4 +1,6 @@
 export const fixtureHashes = {
+  "unit02-first-change":
+    "7b79aa19bc39847f18e6815d9223fa27d0136f9a30d96002fab74f5ec15e1a8a",
   a: "535a1c8eb1acebba36a237996ee955a6c6a436941a92dbd329decaa8de6afa76",
   b: "c647c3d6dc69bd65878ae957abeec3a830849a03d9c7cfaa73fa9039e11f6052",
 } as const;
@@ -11,8 +13,13 @@ export const mediaKinds = [
   "palette",
 ] as const;
 export function mediaUrl(value: unknown, synthetic: boolean) {
-  if (synthetic && ["fixture:a", "fixture:b"].includes(String(value)))
-    return String(value);
+  if (
+    synthetic &&
+    typeof value === "string" &&
+    value.startsWith("fixture:") &&
+    Object.hasOwn(fixtureHashes, value.slice(8))
+  )
+    return value;
   if (typeof value !== "string" || value.length > 2048)
     throw Error("A registered media URL is required.");
   const u = new URL(value);

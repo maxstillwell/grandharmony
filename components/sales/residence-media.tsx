@@ -61,6 +61,87 @@ function Preview({
     </figure>
   );
 }
+function SourceEvidence({
+  value,
+  sha256,
+}: {
+  value: string | null;
+  sha256: string;
+}) {
+  let data: Record<string, unknown> | null = null;
+  try {
+    const parsed = JSON.parse(value ?? "null");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      data = parsed;
+  } catch {
+    /* Free-form reviewer evidence remains supported. */
+  }
+  return (
+    <div className="my-4 text-sm">
+      {data ? (
+        <>
+          <p>
+            <strong>
+              {data.testOnly
+                ? "Controlled source-change test"
+                : "Registered source evidence"}
+            </strong>{" "}
+            ·{" "}
+            {data.requiresManualReview || data.status === "manual-review"
+              ? "Manual review required"
+              : "Source result requires reviewer interpretation"}{" "}
+            · Not architectural approval.
+          </p>
+          <dl className="my-3 grid gap-2 md:grid-cols-2">
+            {[
+              "sourceVersion",
+              "candidateVersion",
+              "floorId",
+              "status",
+              "geometryChanged",
+            ]
+              .filter((k) => data![k] !== undefined)
+              .map((k) => (
+                <div key={k}>
+                  <dt className="text-xs text-stone-500">
+                    {
+                      (
+                        {
+                          sourceVersion: "Original source",
+                          candidateVersion: "Candidate source",
+                          floorId: "Floor",
+                          status: "Matching result",
+                          geometryChanged: "Geometry changed",
+                        } as Record<string, string>
+                      )[k]
+                    }
+                  </dt>
+                  <dd>{String(data![k])}</dd>
+                </div>
+              ))}
+          </dl>
+          {typeof data.note === "string" && <p>{data.note}</p>}
+        </>
+      ) : (
+        <p>
+          {value ??
+            "No previous architectural source supplied; checksum identity alone is not architectural verification."}
+        </p>
+      )}
+      <details className="mt-3">
+        <summary className="cursor-pointer">
+          Source integrity / matching evidence
+        </summary>
+        <p className="break-all">SHA-256 {sha256}</p>
+        {data && (
+          <pre className="whitespace-pre-wrap break-all text-xs">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        )}
+      </details>
+    </div>
+  );
+}
 export function ResidenceMediaWorkspace({
   shared,
   media,
@@ -137,6 +218,17 @@ export function ResidenceMediaWorkspace({
             Load abstract test revisions
           </button>
         )}
+        {demo &&
+          media.sourceSampleAvailable &&
+          Number(data.units.find((u) => u.id === unitId)?.number) === 2 && (
+            <button
+              className="portal-button"
+              disabled={pending || Boolean(versions.length)}
+              onClick={() => void run("media.seedUnit02Demo", { unitId })}
+            >
+              Load genuine Unit 02 + isolated source-change test
+            </button>
+          )}
         <div className="my-5 overflow-x-auto">
           <table className="min-w-[720px] w-full text-left text-sm [overflow-wrap:normal]">
             <thead>
@@ -209,10 +301,11 @@ export function ResidenceMediaWorkspace({
               ? "SYNTHETIC ADAPTER TEST — NOT PROJECT ARCHITECTURE. "
               : ""}
             Source: {version.sourceDocument} · {version.sourceRevision}.
-            Checksum supplied with registration: {version.sha256}. Comparison:{" "}
-            {version.comparisonEvidence ??
-              "Declared checksum comparison only; source-aware detection awaits its adapter."}
           </p>
+          <SourceEvidence
+            value={version.comparisonEvidence}
+            sha256={version.sha256}
+          />
           <div className="my-5 grid gap-4 md:grid-cols-2">
             {previous && (
               <Preview
