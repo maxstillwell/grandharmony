@@ -52,19 +52,17 @@ async function event(
     .insert(s.salesEvents)
     .values({ projectId, actorUserId: actor, action, ...refs, details });
   // Keep PII and confidential price values out of the shared audit log.
-  await db
-    .insert(s.auditLogs)
-    .values({
-      actorUserId: actor,
-      action: `sales.${action}`,
-      entityType: refs.leadId
-        ? "sales_lead"
-        : refs.publicationId
-          ? "sales_publication"
-          : "sales_unit",
-      entityId: refs.unitId ?? refs.leadId ?? refs.publicationId ?? projectId,
-      metadata: { projectId },
-    });
+  await db.insert(s.auditLogs).values({
+    actorUserId: actor,
+    action: `sales.${action}`,
+    entityType: refs.leadId
+      ? "sales_lead"
+      : refs.publicationId
+        ? "sales_publication"
+        : "sales_unit",
+    entityId: refs.unitId ?? refs.leadId ?? refs.publicationId ?? projectId,
+    metadata: { projectId },
+  });
 }
 async function config(db: Context, projectId: string) {
   const [row] = await db
@@ -225,10 +223,20 @@ export function createSalesService(db: SalesDb) {
           if (!saved) throw new Error("Stage was not found in this project.");
           stageId = saved.id;
         } else {
-          const [saved] = await tx.insert(table).values({ projectId, ...values }).returning({ id: table.id });
+          const [saved] = await tx
+            .insert(table)
+            .values({ projectId, ...values })
+            .returning({ id: table.id });
           stageId = saved.id;
         }
-        await event(tx, projectId, access.userId, `stage.${row.kind}.saved`, {}, { stageId });
+        await event(
+          tx,
+          projectId,
+          access.userId,
+          `stage.${row.kind}.saved`,
+          {},
+          { stageId },
+        );
         return stageId;
       });
     },
@@ -932,6 +940,27 @@ export function createSalesService(db: SalesDb) {
           ),
         )
         .orderBy(desc(s.salesEvents.createdAt));
+    },
+    async unitActivity(access: PortalAccess, projectId: string, id: string) {
+      assertSales(access, projectId, "audit.view");
+      if (!validId(id)) throw new Error("Invalid residence.");
+      const [unit] = await db
+        .select({ id: s.salesUnits.id })
+        .from(s.salesUnits)
+        .where(scope(projectId, id));
+      if (!unit) throw new Error("Residence was not found in this project.");
+      return db
+        .select()
+        .from(s.salesEvents)
+        .where(
+          and(
+            eq(s.salesEvents.projectId, projectId),
+            eq(s.salesEvents.unitId, id),
+            sql`${s.salesEvents.leadId} is null`,
+          ),
+        )
+        .orderBy(desc(s.salesEvents.createdAt))
+        .limit(200);
     },
     async workspace(access: PortalAccess, projectId: string) {
       assertSales(access, projectId, "inventory.view");

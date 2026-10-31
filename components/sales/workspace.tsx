@@ -26,6 +26,7 @@ export function SalesWorkspace({
 }) {
   const [tab, setTab] = useState("Overview");
   const [selectedUnitId, onSelectUnit] = useState<string | null>(null);
+  const [crmLeadId, setCrmLeadId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
@@ -34,7 +35,7 @@ export function SalesWorkspace({
   const router = useRouter();
   const run = useCallback(
     async (operation: string, input: Record<string, unknown>) => {
-      const reading = operation === "activity";
+      const reading = operation === "activity" || operation === "unitActivity";
       if (!reading && saving.current) return undefined;
       if (!reading) {
         saving.current = true;
@@ -77,6 +78,11 @@ export function SalesWorkspace({
     reviewPlan,
     selectedUnitId,
     onSelectUnit,
+    feedback: { message, failed },
+    onOpenLead: (id: string) => {
+      setCrmLeadId(id);
+      setTab("Leads / CRM");
+    },
   };
   const tabs = [
     "Overview",
@@ -164,7 +170,9 @@ export function SalesWorkspace({
         {tab === "Stages" && <Stages {...shared} />}
         {tab === "Import" && <Import {...shared} />}
         {tab === "Publishing" && <Publishing {...shared} />}
-        {tab === "Leads / CRM" && <Crm {...shared} />}
+        {tab === "Leads / CRM" && (
+          <Crm {...shared} key={crmLeadId ?? "crm"} initialLeadId={crmLeadId} />
+        )}
         {tab === "Settings" && <Settings {...shared} />}
         {tab === "Activity / Audit" && (
           <section className="portal-card">

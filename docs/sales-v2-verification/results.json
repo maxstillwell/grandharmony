@@ -1,0 +1,17 @@
+{
+  "passed": 10,
+  "tests": [
+    "Residence header reverses real numeric 1\u201347 order with active aria-sort",
+    "All room, independent area and three price columns sort numerically both ways; nulls stay last and no zero is invented",
+    "Business status, release sequence, type and tags sort correctly together with search/filters",
+    "Open immediately shows residence details and permitted prices; map synchronizes; Escape restores trigger focus",
+    "Keyboard Actions menu opens a functional status form; confirmed save refreshes canonical status and map colour",
+    "Pricing and edit actions save through existing operations; advertising draft does not publish or overwrite internal/contract prices",
+    "Activity is unit-scoped; CRM action opens the actual associated lead in the existing CRM workspace",
+    "Restricted view hides confidential columns/details, edit/status/pricing/CRM/audit menu entries",
+    "390px real touch sorting, horizontally scrolled Open/Actions and modal fit without page overflow",
+    "No uncaught browser exceptions"
+  ],
+  "pageErrors": [],
+  "scope": "Synthetic loopback UI; no production mutations or authenticated live-session claim"
+}

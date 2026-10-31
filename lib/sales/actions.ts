@@ -101,10 +101,13 @@ export async function salesAction(
       case "activity":
         data = await service.leadActivity(access, projectId, String(row.id));
         break;
+      case "unitActivity":
+        data = await service.unitActivity(access, projectId, String(row.id));
+        break;
       default:
         throw new Error("Unknown operation.");
     }
-    if (operation !== "activity") {
+    if (operation !== "activity" && operation !== "unitActivity") {
       revalidatePath(`/portal/projects/${projectId}/sales`);
       revalidatePath("/portal/sales");
     }

@@ -18,4 +18,6 @@ export type Shared = {
   reviewPlan?: ManagementPlan;
   selectedUnitId?: string | null;
   onSelectUnit?: (id: string | null) => void;
+  feedback?: { message: string; failed: boolean };
+  onOpenLead?: (id: string) => void;
 };

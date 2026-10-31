@@ -1,0 +1,16 @@
+{
+  "lint": "PASS",
+  "typecheck": "PASS",
+  "automatedTests": 48,
+  "productionBuild": "PASS",
+  "browserFlows": {
+    "v2": 10,
+    "existingInventoryRegression": 9,
+    "total": 19,
+    "scope": "Synthetic loopback UI only; not an authenticated live session"
+  },
+  "productionWrites": 0,
+  "migrations": 0,
+  "golfviewRepositoryChanges": 0,
+  "unit1PublicationGuard": "preserved"
+}

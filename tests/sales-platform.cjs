@@ -708,3 +708,45 @@ test('design conflict imports privately but cannot enter a publication draft', a
   assert.throws(()=>domain.makeSnapshot('golfview',1,[{...u,publicVisible:true}]),/DESIGN CONFLICT/);
   assert.deepEqual(domain.makeSnapshot('golfview',1,[u]).units,[]);
 });
+
+test('inventory sorting handles exact decimals, nulls-last and natural stable ties without mutating rows', () => {
+ const {sortInventory}=require('../lib/sales/inventory-sort.ts');
+ const row=(number,patch={})=>({id:number,number,status:'available',releaseStageId:null,housingType:null,bedrooms:null,bathrooms:null,carSpaces:null,buildingAreaSqm:null,landAreaSqm:null,publicAskingPrice:null,features:[],...patch});
+ const rows=[row('10',{bedrooms:3,buildingAreaSqm:'9.00',landAreaSqm:'100.00'}),row('2',{bedrooms:4,buildingAreaSqm:'100.00',landAreaSqm:'9.00'}),row('1',{bedrooms:2}),row('3',{bedrooms:4,buildingAreaSqm:'100.00'})];
+ const order=(key,direction='asc',stages=[],prices=[])=>sortInventory(rows,{key,direction},stages,prices).map(u=>u.number);
+ assert.deepEqual(order('number'),['1','2','3','10']);assert.deepEqual(order('number','desc'),['10','3','2','1']);
+ assert.deepEqual(order('bedrooms','desc'),['2','3','10','1']);
+ assert.deepEqual(order('buildingAreaSqm'),['10','2','3','1']);assert.deepEqual(order('buildingAreaSqm','desc'),['2','3','10','1']);
+ assert.deepEqual(order('landAreaSqm'),['2','10','1','3']);
+ const prices=[{unitId:'2',askingPrice:'999999999999.98',contractPrice:'100.00'},{unitId:'10',askingPrice:'999999999999.99',contractPrice:'9.00'}];
+ assert.deepEqual(order('internalPrice','desc',[],prices),['10','2','1','3']);assert.deepEqual(order('contractPrice','asc',[],prices),['10','2','1','3']);
+ assert.deepEqual(rows.map(r=>r.number),['10','2','1','3']);
+});
+test('inventory sorting uses business status and release sequence, plus all independent attributes',()=>{
+ const {sortInventory}=require('../lib/sales/inventory-sort.ts');
+ const base={status:'available',releaseStageId:null,housingType:'A2',bedrooms:3,bathrooms:2,carSpaces:1,buildingAreaSqm:'100.00',landAreaSqm:'90.00',publicAskingPrice:'100000.00',features:['Garden']};
+ const rows=[{...base,id:'1',number:'1',status:'settled',releaseStageId:'early',housingType:'A10',bathrooms:3,carSpaces:2,publicAskingPrice:'90000.00',features:[]},{...base,id:'2',number:'2',releaseStageId:'late'}];
+ const sort=(key,direction='asc')=>sortInventory(rows,{key,direction},[{id:'late',sequence:10},{id:'early',sequence:2}],[]).map(u=>u.number);
+ for(const key of ['status','housingType','bathrooms','carSpaces','features'])assert.deepEqual(sort(key),['2','1']);
+ assert.deepEqual(sort('releaseStageId'),['1','2']);assert.deepEqual(sort('releaseStageId','desc'),['2','1']);assert.deepEqual(sort('advertisingPrice'),['1','2']);
+});
+
+test('asking, advertising and contract prices stay independent and contract price cannot enter ordinary exports or snapshots',async()=>{
+ const f=await fixture(),id=await unit(f,'PRICES-INDEPENDENT');
+ await service.savePrices(f.admin,f.projectId,id,1,{askingPrice:'1100001.11'});
+ let w=await service.workspace(f.admin,f.projectId);assert.equal(w.prices[0].contractPrice,null);assert.equal(w.units[0].publicAskingPrice,null);
+ await service.savePrices(f.admin,f.projectId,id,2,{publicAskingPrice:'1200002.22',publicPriceVisible:true},true);
+ w=await service.workspace(f.admin,f.projectId);assert.equal(w.prices[0].askingPrice,'1100001.11');assert.equal(w.prices[0].contractPrice,null);
+ await service.savePrices(f.admin,f.projectId,id,3,{askingPrice:'1100001.11',contractPrice:'1000003.33'});
+ const draft=await service.createDraft(f.admin,f.projectId);w=await service.workspace(f.admin,f.projectId);
+ const snapshot=JSON.stringify(w.publications.find(p=>p.id===draft).snapshot);assert.ok(!snapshot.includes('1000003.33'));assert.ok(!snapshot.includes('1100001.11'));
+ const exported=await service.exportCsv(f.admin,f.projectId,'inventory');assert.ok(!exported.includes('1000003.33'));assert.ok(!exported.includes('contractPrice'));assert.ok(!exported.includes('contract_price'));
+ await assert.rejects(service.exportCsv(f.access('sales_manager'),f.projectId,'prices'),/authorised/);
+});
+
+test('residence activity enforces audit permission, exact project scope and no other residence history',async()=>{
+ const f=await fixture(),a=await unit(f,'AUDIT-1'),b=await unit(f,'AUDIT-2');
+ const events=await service.unitActivity(f.admin,f.projectId,a);assert.equal(events.length,1);assert.ok(events.every(e=>e.unitId===a && e.unitId!==b));
+ await assert.rejects(service.unitActivity(f.access('sales_manager'),f.projectId,a),/authorised/);
+ const other=await fixture();await assert.rejects(service.unitActivity(other.admin,other.projectId,a),/not found/);
+});

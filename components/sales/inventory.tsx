@@ -1,19 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
-import { BedDouble, Bath, CarFront, ImageIcon } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 import type { Shared, Unit } from "./types";
 import { nextUnitStatuses, unitStatuses } from "@/lib/sales/domain";
+import { Field, formRecord, label, Select } from "./forms";
+import { InventoryActions, type ResidenceView } from "./inventory-actions";
+import { ResidencePanel } from "./residence-panel";
 import {
-  Area,
-  Check,
-  date,
-  Field,
-  formRecord,
-  label,
-  Select,
-  options,
-} from "./forms";
+  sortInventory,
+  type InventorySort,
+  type InventorySortKey,
+} from "@/lib/sales/inventory-sort";
 import { InventoryMap } from "./inventory-map";
 import { money, statusPresentation } from "./inventory-status";
 import styles from "./inventory.module.css";
@@ -22,7 +20,11 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
   const { data, projectId } = shared;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [sort, setSort] = useState("number");
+  const [sort, setSort] = useState<InventorySort>({
+    key: "number",
+    direction: "asc",
+  });
+  const [panelView, setPanelView] = useState<ResidenceView>("details");
   const [construction, setConstruction] = useState("");
   const [release, setRelease] = useState("");
   const [publication, setPublication] = useState("");
@@ -30,31 +32,83 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
   const selected = shared.selectedUnitId ?? localSelected;
   const setSelected = shared.onSelectUnit ?? setLocalSelected;
   const [editing, setEditing] = useState<string | null>(null);
+  const panelOpener = useRef<HTMLElement | null>(null);
   const [showMap, setShowMap] = useState(Boolean(shared.mapOnly));
   const published = new Set(data.publicData?.units.map((u) => u.id) ?? []);
-  const units = data.units
-    .filter(
-      (u) =>
-        `${u.number} ${u.lot ?? ""} ${u.housingType ?? ""} ${u.features.join(" ")}`
-          .toLowerCase()
-          .includes(search.toLowerCase()) &&
-        (!status || u.status === status) &&
-        (!construction || u.constructionStageId === construction) &&
-        (!release || u.releaseStageId === release) &&
-        (!publication ||
-          (publication === "published"
-            ? published.has(u.id)
-            : publication === "unpublished"
-              ? !published.has(u.id)
-              : u.publicVisible)),
-    )
-    .sort((a, b) =>
-      String(a[sort as "number" | "status"]).localeCompare(
-        String(b[sort as "number" | "status"]),
-        undefined,
-        { numeric: true },
-      ),
-    );
+  const filtered = data.units.filter(
+    (u) =>
+      `${u.number} ${u.lot ?? ""} ${u.housingType ?? ""} ${u.features.join(" ")}`
+        .toLowerCase()
+        .includes(search.toLowerCase()) &&
+      (!status || u.status === status) &&
+      (!construction || u.constructionStageId === construction) &&
+      (!release || u.releaseStageId === release) &&
+      (!publication ||
+        (publication === "published"
+          ? published.has(u.id)
+          : publication === "unpublished"
+            ? !published.has(u.id)
+            : u.publicVisible)),
+  );
+  const units = sortInventory(
+    filtered,
+    sort,
+    data.release,
+    data.permissions["prices.view"] ? data.prices : [],
+  );
+  const columns: Array<{
+    title: string;
+    key?: InventorySortKey;
+    numeric?: boolean;
+  }> = [
+    { title: "Residence", key: "number" },
+    { title: "Status", key: "status" },
+    { title: "Release Stage", key: "releaseStageId" },
+    { title: "Type", key: "housingType" },
+    { title: "Beds", key: "bedrooms", numeric: true },
+    { title: "Baths", key: "bathrooms", numeric: true },
+    { title: "Cars", key: "carSpaces", numeric: true },
+    { title: "Building Area", key: "buildingAreaSqm", numeric: true },
+    { title: "Land Area", key: "landAreaSqm", numeric: true },
+    { title: "Advertising Price", key: "advertisingPrice", numeric: true },
+    ...(data.permissions["prices.view"]
+      ? [
+          {
+            title: "Internal Price",
+            key: "internalPrice" as const,
+            numeric: true,
+          },
+          {
+            title: "Contract Price",
+            key: "contractPrice" as const,
+            numeric: true,
+          },
+        ]
+      : []),
+    { title: "Tags", key: "features" },
+    { title: "Publication" },
+    { title: "Open" },
+    { title: "Actions" },
+  ];
+  const changeSort = (key: InventorySortKey) =>
+    setSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  const openResidence = (id: string, view: ResidenceView) => {
+    panelOpener.current = document.activeElement as HTMLElement;
+    setSelected(id);
+    setEditing(id);
+    setPanelView(view);
+    setShowMap(true);
+  };
+  const closeResidence = () => {
+    setEditing(null);
+    const opener = panelOpener.current;
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    });
+  };
   const unit = data.units.find((u) => u.id === editing);
   const active = data.units.find((u) => u.id === selected);
   const reset = () => {
@@ -82,7 +136,15 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
               {showMap ? "Hide linked map" : "Show linked map"}
             </button>
             {data.permissions["inventory.edit"] && (
-              <button onClick={() => setEditing("new")}>Create unit</button>
+              <button
+                onClick={() => {
+                  panelOpener.current = document.activeElement as HTMLElement;
+                  setEditing("new");
+                  setPanelView("edit");
+                }}
+              >
+                Create unit
+              </button>
             )}
             {data.units.length > 0 && (
               <a
@@ -179,17 +241,6 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
               <option value="draft">Included in next draft</option>
             </select>
           </label>
-          <label>
-            Sort
-            <select
-              aria-label="Sort"
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              <option value="number">Unit number</option>
-              <option value="status">Sales status</option>
-            </select>
-          </label>
         </div>
         <p className="portal-helper mb-4">
           Internal working inventory · AUD. Saved changes appear here and on the
@@ -219,142 +270,169 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
             </caption>
             <thead>
               <tr>
-                {[
-                  "Residence",
-                  "Status",
-                  "Stages",
-                  "Publication",
-                  "Public price draft",
-                  ...(data.permissions["prices.view"]
-                    ? ["Internal asking price"]
-                    : []),
-                  "Areas",
-                  "Rooms",
-                  "Tags",
-                  "Actions",
-                ].map((t) => (
-                  <th scope="col" key={t}>
-                    {t}
+                {columns.map((c) => (
+                  <th
+                    scope="col"
+                    key={c.title}
+                    className={c.numeric ? styles.numeric : undefined}
+                    aria-sort={
+                      c.key
+                        ? sort.key === c.key
+                          ? sort.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                        : undefined
+                    }
+                  >
+                    {c.key ? (
+                      <button
+                        className={styles.sortHeading}
+                        onClick={() => changeSort(c.key!)}
+                        aria-label={`${c.title}, sort ${sort.key === c.key && sort.direction === "asc" ? "descending" : "ascending"}`}
+                      >
+                        {c.title}
+                        <span aria-hidden="true">
+                          {sort.key === c.key
+                            ? sort.direction === "asc"
+                              ? "↑"
+                              : "↓"
+                            : "↕"}
+                        </span>
+                      </button>
+                    ) : (
+                      c.title
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {units.map((u) => (
-                <tr
-                  key={u.id}
-                  data-unit-row={u.id}
-                  data-selected={selected === u.id}
-                >
-                  <td>
-                    <button
-                      className={styles.unitButton}
-                      aria-label={`Select residence ${u.number}`}
-                      aria-pressed={selected === u.id}
-                      onClick={() => setSelected(u.id)}
-                    >
-                      <Thumbnail url={u.media[0]} number={u.number} />
-                      <span>
-                        {u.number}
-                        <small className={styles.muted}>
-                          {u.housingType ?? "Type pending"}
-                          {u.lot ? ` · Lot ${u.lot}` : ""}
-                        </small>
-                      </span>
-                    </button>
-                  </td>
-                  <td>
-                    <Status status={u.status} />
-                  </td>
-                  <td>
-                    {data.release.find((s) => s.id === u.releaseStageId)
-                      ?.name ?? "Release unassigned"}
-                    <small className={styles.muted}>
-                      {data.construction.find(
-                        (s) => s.id === u.constructionStageId,
-                      )?.name ?? "Construction unassigned"}
-                    </small>
-                  </td>
-                  <td>
-                    <span className={styles.tag}>
-                      {published.has(u.id) ? "Live snapshot" : "Unpublished"}
-                    </span>
-                    <small className={styles.muted}>
-                      {u.publicVisible
-                        ? "Included in next draft"
-                        : "Excluded from next draft"}
-                    </small>
-                  </td>
-                  <td>
-                    {u.publicPriceVisible && u.publicAskingPrice !== null
-                      ? money(u.publicAskingPrice)
-                      : "Price on application"}
-                    <small className={styles.muted}>
-                      {published.has(u.id)
-                        ? `Live: ${data.publicData?.units.find((p) => p.id === u.id)?.priceDisplay ?? "Not published"}`
-                        : "Not live"}
-                    </small>
-                  </td>
-                  {data.permissions["prices.view"] && (
+              {units.map((u) => {
+                const price = data.prices.find((p) => p.unitId === u.id);
+                return (
+                  <tr
+                    key={u.id}
+                    data-unit-row={u.id}
+                    data-number={u.number}
+                    data-selected={selected === u.id}
+                  >
                     <td>
-                      {money(
-                        data.prices.find((p) => p.unitId === u.id)?.askingPrice,
-                      )}
-                      <small className={styles.muted}>Confidential</small>
-                    </td>
-                  )}
-                  <td>
-                    {u.landAreaSqm ?? "—"} m² land
-                    <small className={styles.muted}>
-                      {u.buildingAreaSqm ?? "—"} m² building
-                    </small>
-                  </td>
-                  <td>
-                    <span className="inline-flex items-center gap-2">
-                      <BedDouble size={13} />
-                      {u.bedrooms ?? "—"}
-                      <Bath size={13} />
-                      {u.bathrooms ?? "—"}
-                      <CarFront size={13} />
-                      {u.carSpaces ?? "—"}
-                    </span>
-                    <span className="sr-only">
-                      Bedrooms, bathrooms and car spaces
-                    </span>
-                  </td>
-                  <td>
-                    {u.features.slice(0, 2).map((tag) => (
-                      <span className={styles.tag} key={tag}>
-                        {tag}
-                      </span>
-                    ))}
-                    {u.features.length > 2 && (
-                      <span className={styles.tag}>
-                        +{u.features.length - 2}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <div className={styles.actions}>
                       <button
-                        onClick={() => {
-                          setSelected(u.id);
-                          setEditing(u.id);
-                        }}
+                        className={styles.unitButton}
+                        aria-label={`Select residence ${u.number}`}
+                        aria-pressed={selected === u.id}
+                        onClick={() => setSelected(u.id)}
+                      >
+                        <Thumbnail url={u.media[0]} number={u.number} />
+                        <span>
+                          {u.number}
+                          {u.lot && (
+                            <small className={styles.muted}>Lot {u.lot}</small>
+                          )}
+                        </span>
+                      </button>
+                    </td>
+                    <td>
+                      <Status status={u.status} />
+                    </td>
+                    <td>
+                      {data.release.find((s) => s.id === u.releaseStageId)
+                        ?.name ?? "—"}
+                      <small className={styles.muted}>
+                        {data.construction.find(
+                          (s) => s.id === u.constructionStageId,
+                        )?.name ?? "Construction unassigned"}
+                      </small>
+                    </td>
+                    <td>{u.housingType ?? "—"}</td>
+                    <td className={styles.numeric}>{u.bedrooms ?? "—"}</td>
+                    <td className={styles.numeric}>{u.bathrooms ?? "—"}</td>
+                    <td className={styles.numeric}>{u.carSpaces ?? "—"}</td>
+                    <td className={`${styles.numeric} ${styles.building}`}>
+                      {u.buildingAreaSqm === null
+                        ? "—"
+                        : `${u.buildingAreaSqm} m²`}
+                    </td>
+                    <td className={styles.numeric}>
+                      {u.landAreaSqm === null ? "—" : `${u.landAreaSqm} m²`}
+                    </td>
+                    <td className={`${styles.numeric} ${styles.price}`}>
+                      {money(u.publicAskingPrice)}
+                      <small className={styles.muted}>
+                        Draft ·{" "}
+                        {u.publicPriceVisible
+                          ? "Included in next price draft"
+                          : "Not set for publication"}
+                      </small>
+                      {published.has(u.id) && (
+                        <small className={styles.muted}>
+                          Live:{" "}
+                          {data.publicData?.units.find((p) => p.id === u.id)
+                            ?.priceDisplay ?? "—"}
+                        </small>
+                      )}
+                    </td>
+                    {data.permissions["prices.view"] && (
+                      <>
+                        <td className={`${styles.numeric} ${styles.price}`}>
+                          {money(price?.askingPrice)}
+                          <small className={styles.muted}>Confidential</small>
+                        </td>
+                        <td className={`${styles.numeric} ${styles.price}`}>
+                          {money(price?.contractPrice)}
+                          <small className={styles.muted}>
+                            Confidential · agreed only
+                          </small>
+                        </td>
+                      </>
+                    )}
+                    <td>
+                      {u.features.slice(0, 2).map((tag, i) => (
+                        <span key={`${tag}-${i}`} className={styles.tag}>
+                          {tag}
+                        </span>
+                      ))}
+                      {u.features.length > 2 && (
+                        <span className={styles.tag}>
+                          +{u.features.length - 2}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={styles.tag}>
+                        {published.has(u.id) ? "Live snapshot" : "Unpublished"}
+                      </span>
+                      <small className={styles.muted}>
+                        {u.publicVisible
+                          ? "Included in next draft"
+                          : "Excluded from next draft"}
+                      </small>
+                      {u.validationWarnings.some((w) =>
+                        w.includes("DESIGN CONFLICT"),
+                      ) && (
+                        <span className={styles.conflict}>DESIGN CONFLICT</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className="portal-button"
                         aria-label={`Open residence ${u.number}`}
+                        onClick={() => openResidence(u.id, "details")}
                       >
                         Open
                       </button>
-                      <button
-                        onClick={() => setSelected(u.id)}
-                        aria-label={`Quick actions residence ${u.number}`}
-                      >
-                        Actions
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <InventoryActions
+                        unit={u}
+                        permissions={data.permissions}
+                        onAction={(view) => openResidence(u.id, view)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {!units.length && (
@@ -392,7 +470,7 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
                 <Status status={active.status} />
               </div>
               <div className={styles.actions}>
-                <button onClick={() => setEditing(active.id)}>
+                <button onClick={() => openResidence(active.id, "edit")}>
                   Edit full record
                 </button>
                 <button onClick={() => setSelected(null)}>
@@ -468,28 +546,17 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
         )}
       </section>
       {editing && (
-        <section
-          className={`portal-card ${styles.detail}`}
-          aria-label="Inventory editor"
-        >
-          <button
-            className="portal-button mb-5"
-            onClick={() => setEditing(null)}
-          >
-            Close unit
-          </button>
-          {unit || editing === "new" ? (
-            <UnitEditor
-              {...shared}
-              unit={unit}
-              onSaved={(id) => {
-                setSelected(id);
-                setEditing(id);
-              }}
-              key={`${editing}-${unit?.revision ?? 0}`}
-            />
-          ) : null}
-        </section>
+        <ResidencePanel
+          key={`${editing}-${panelView}`}
+          shared={shared}
+          unit={unit}
+          initialView={panelView}
+          onClose={closeResidence}
+          onSaved={(id) => {
+            setSelected(id);
+            setEditing(id);
+          }}
+        />
       )}
     </>
   );
@@ -519,284 +586,5 @@ function Thumbnail({ url, number }: { url?: string; number: string }) {
     <span className={styles.thumb} aria-hidden="true">
       <ImageIcon size={16} />
     </span>
-  );
-}
-function UnitEditor({
-  data,
-  run,
-  pending,
-  unit,
-  onSaved,
-}: Shared & { unit?: Unit; onSaved: (id: string) => void }) {
-  const prices = data.prices.find((p) => p.unitId === unit?.id);
-  const id = unit ? { id: unit.id, revision: unit.revision } : {};
-  return (
-    <>
-      <h2 className="mb-5">
-        {unit
-          ? `Residence ${unit.number} · revision ${unit.revision}`
-          : "Create a real unit"}
-      </h2>
-      {data.permissions["inventory.edit"] && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const saved = await run("unit", {
-              ...formRecord(e.currentTarget),
-              ...id,
-            });
-            if (typeof saved === "string") onSaved(saved);
-          }}
-          className="space-y-5"
-        >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              ["number", "Approved unit number"],
-              ["lot", "Lot identifier"],
-              ["housingType", "Housing type"],
-              ["bedrooms", "Bedrooms"],
-              ["bathrooms", "Bathrooms"],
-              ["carSpaces", "Parking spaces"],
-              ["floorLevels", "Floor levels"],
-              ["landAreaSqm", "Land area (m²)"],
-              ["buildingAreaSqm", "Building area (m²)"],
-              ["internalAreaSqm", "Internal living (m²)"],
-              ["outdoorAreaSqm", "Outdoor area (m²)"],
-              ["totalAreaSqm", "Total area (m²)"],
-            ].map(([key, title]) => (
-              <Field
-                key={key}
-                name={key}
-                label={title}
-                value={unit?.[key as keyof Unit] as string | number | null}
-                required={key === "number"}
-                type={
-                  ["number", "lot", "housingType"].includes(key)
-                    ? "text"
-                    : "number"
-                }
-                step={
-                  [
-                    "bedrooms",
-                    "bathrooms",
-                    "carSpaces",
-                    "floorLevels",
-                  ].includes(key)
-                    ? "1"
-                    : "0.01"
-                }
-              />
-            ))}
-            <Select
-              name="constructionStageId"
-              label="Construction stage"
-              value={unit?.constructionStageId}
-              options={[
-                { value: "", label: "Unassigned" },
-                ...data.construction.map((s) => ({
-                  value: s.id,
-                  label: s.name,
-                })),
-              ]}
-            />
-            <Select
-              name="releaseStageId"
-              label="Sales release stage"
-              value={unit?.releaseStageId}
-              options={[
-                { value: "", label: "Unassigned" },
-                ...data.release.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-          </div>
-          <Field
-            name="sourceDocument"
-            label="Source document and approved revision reference"
-            value={unit?.sourceDocument}
-            required
-          />
-          <Area
-            name="internalNotes"
-            label="Internal notes — never published"
-            value={unit?.internalNotes}
-          />
-          {(["features", "floorPlans", "media", "specifications"] as const).map(
-            (key) => (
-              <Area
-                key={key}
-                name={key}
-                label={`${label(key)} — one per line${key !== "features" ? "; approved public HTTPS URLs only" : ""}`}
-                value={unit?.[key].join("\n")}
-              />
-            ),
-          )}
-          <Check
-            name="publicVisible"
-            label="Include this unit in a future publication draft. Saving does not publish it."
-            checked={unit?.publicVisible}
-          />
-          <button className="portal-button" disabled={pending}>
-            Save inventory details
-          </button>
-        </form>
-      )}
-      {unit && !data.permissions["inventory.edit"] && (
-        <dl className="space-y-3">
-          {[
-            "housingType",
-            "bedrooms",
-            "bathrooms",
-            "carSpaces",
-            "landAreaSqm",
-            "buildingAreaSqm",
-            "sourceDocument",
-          ].map((key) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>{String(unit[key as keyof Unit] ?? "Not recorded")}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {unit &&
-        data.permissions["status.edit"] &&
-        nextUnitStatuses(unit.status).length > 0 && (
-          <form
-            className="mt-8 space-y-4 border-t pt-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run("status", { ...formRecord(e.currentTarget), ...id });
-            }}
-          >
-            <h3>Sales status · currently {label(unit.status)}</h3>
-            <Select
-              name="status"
-              label="Requested status"
-              value={nextUnitStatuses(unit.status)[0]}
-              options={options(nextUnitStatuses(unit.status))}
-            />
-            <Field name="reason" label="Reason for transition" required />
-            <button className="portal-button" disabled={pending}>
-              Record status change
-            </button>
-          </form>
-        )}
-      {unit && data.permissions["publicPrices.edit"] && (
-        <form
-          className="mt-8 space-y-4 border-t pt-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run("publicPrice", { ...formRecord(e.currentTarget), ...id });
-          }}
-        >
-          <h3>Public price draft · AUD</h3>
-          <Field
-            name="publicAskingPrice"
-            label="Approved public asking price (decimal, no commas)"
-            type="number"
-            value={unit.publicAskingPrice}
-          />
-          <Check
-            name="publicPriceVisible"
-            label="Include this price in a future approved snapshot"
-            checked={unit.publicPriceVisible}
-          />
-          <button className="portal-button" disabled={pending}>
-            Save public price draft
-          </button>
-        </form>
-      )}
-      {unit && data.permissions["prices.view"] && (
-        <section className="mt-8 border-t pt-6">
-          <h3>Confidential prices · AUD</h3>
-          <p className="portal-helper">
-            Due dates use Sydney time (AEST / AEDT).
-          </p>
-          {data.permissions["prices.edit"] ? (
-            <form
-              className="mt-4 space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void run("prices", { ...formRecord(e.currentTarget), ...id });
-              }}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  "askingPrice",
-                  "minimumPrice",
-                  "contractPrice",
-                  "depositAmount",
-                  "settlementAmount",
-                ].map((key) => (
-                  <Field
-                    key={key}
-                    name={key}
-                    label={
-                      (
-                        {
-                          askingPrice: "Asking price",
-                          minimumPrice: "Minimum price",
-                          contractPrice: "Contract price",
-                          depositAmount: "Deposit amount",
-                          settlementAmount: "Settlement amount",
-                        } as Record<string, string>
-                      )[key]
-                    }
-                    type="number"
-                    value={
-                      prices?.[key as keyof typeof prices] as string | null
-                    }
-                  />
-                ))}
-                <Field
-                  name="depositDueAt"
-                  label="Deposit due"
-                  type="datetime-local"
-                  value={date(prices?.depositDueAt ?? null)}
-                  instant={prices?.depositDueAt}
-                />
-                <Field
-                  name="settlementDueAt"
-                  label="Settlement due"
-                  type="datetime-local"
-                  value={date(prices?.settlementDueAt ?? null)}
-                  instant={prices?.settlementDueAt}
-                />
-                <Select
-                  name="gstTreatment"
-                  label="GST treatment"
-                  value={prices?.gstTreatment ?? "unconfirmed"}
-                  options={options([
-                    "unconfirmed",
-                    "inclusive",
-                    "exclusive",
-                    "margin_scheme",
-                    "not_applicable",
-                  ])}
-                />
-              </div>
-              <button className="portal-button" disabled={pending}>
-                Save confidential prices
-              </button>
-            </form>
-          ) : (
-            <pre>{JSON.stringify(prices ?? {}, null, 2)}</pre>
-          )}
-        </section>
-      )}
-      {unit && (
-        <details className="mt-6">
-          <summary>Validation warnings and source provenance</summary>
-          <ul>
-            {unit.validationWarnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-          <pre className="overflow-auto text-xs">
-            {JSON.stringify(unit.provenance, null, 2)}
-          </pre>
-        </details>
-      )}
-    </>
   );
 }
