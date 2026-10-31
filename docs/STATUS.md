@@ -1,5 +1,11 @@
 # Status
 
+## Sales platform development branch
+
+Phase 2 implementation is on `feature/golfview-sales-platform`, including inventory, independent stages, private prices, controlled publications, CRM and public/enquiry API handlers. See [implementation and release gates](sales-platform.md).
+
+Production Neon schema/migration state (including 0004), live authenticated sales operation and production backend release remain unverified. No production migration or merge is claimed. The approved public inventory stays empty until owner data is supplied and explicitly published.
+
 ## Phase 3D — Model Management & Scenario Comparison
 
 ### Completed in source
