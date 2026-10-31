@@ -694,3 +694,17 @@ test('draft map requires Golfview membership, intersected sales permissions and 
   assert.equal(canReviewSalesMap({...a,projects:[{...project,membershipRole:'external_agent'}]},project.id),false);
   assert.equal(canReviewSalesMap({...a,projects:[{...project,membershipRole:'unknown'}]},project.id),false);
 });
+
+test('design conflict imports privately but cannot enter a publication draft', async () => {
+  const f=await fixture();
+  const source='Owner CSV; DESIGN CONFLICT: architect/owner confirmation required';
+  const csv=`number,housingType,sourceDocument\n1,A-1C,${source}`;
+  await service.importInventory(f.admin,f.projectId,csv,false);
+  await service.importInventory(f.admin,f.projectId,csv,true);
+  const w=await service.workspace(f.admin,f.projectId),u=w.units[0];
+  assert.equal(u.housingType,'A-1C');assert.equal(u.publicVisible,false);
+  assert.ok(u.validationWarnings.some(x=>x.includes('DESIGN CONFLICT')));
+  await assert.rejects(service.saveUnit(f.admin,f.projectId,{...u,publicVisible:true},u.id,u.revision),/DESIGN CONFLICT/);
+  assert.throws(()=>domain.makeSnapshot('golfview',1,[{...u,publicVisible:true}]),/DESIGN CONFLICT/);
+  assert.deepEqual(domain.makeSnapshot('golfview',1,[u]).units,[]);
+});

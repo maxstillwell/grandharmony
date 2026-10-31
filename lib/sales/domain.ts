@@ -145,6 +145,13 @@ export function validateUnit(input: unknown) {
   const number = text(row.number, 40, true)!.toUpperCase();
   if (number.startsWith("TEST-") || /[\r\n]/.test(number))
     throw new Error("Fictional test numbers cannot enter inventory.");
+  const designConflict = /DESIGN[ _-]+CONFLICT/i.test(
+    `${row.sourceDocument ?? ""} ${row.internalNotes ?? ""}`,
+  );
+  if (designConflict && row.publicVisible === true)
+    throw new Error(
+      "Resolve the DESIGN CONFLICT with architect/owner confirmation before including this unit in a publication draft.",
+    );
   return {
     number,
     lot: text(row.lot, 80),
@@ -167,10 +174,21 @@ export function validateUnit(input: unknown) {
     specifications: stringList(row.specifications, true),
     sourceDocument: text(row.sourceDocument, 1000, true)!,
     validationWarnings: [
+      ...(designConflict
+        ? [
+            "DESIGN CONFLICT — architect/owner confirmation required before publication.",
+          ]
+        : []),
       ...(!row.housingType ? ["Housing type has not been supplied."] : []),
-      ...(row.bedrooms == null || row.bedrooms === "" ? ["Bedroom count has not been supplied."] : []),
-      ...(!row.landAreaSqm || !row.buildingAreaSqm ? ["Land or building area has not been supplied."] : []),
-      ...(!Array.isArray(row.floorPlans) || !row.floorPlans.length ? ["Approved floor-plan references are pending."] : []),
+      ...(row.bedrooms == null || row.bedrooms === ""
+        ? ["Bedroom count has not been supplied."]
+        : []),
+      ...(!row.landAreaSqm || !row.buildingAreaSqm
+        ? ["Land or building area has not been supplied."]
+        : []),
+      ...(!Array.isArray(row.floorPlans) || !row.floorPlans.length
+        ? ["Approved floor-plan references are pending."]
+        : []),
     ],
     publicVisible: row.publicVisible === true,
   };
