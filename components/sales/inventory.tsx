@@ -207,6 +207,7 @@ export function Inventory(shared: Shared) {
             <UnitEditor
               {...shared}
               unit={unit}
+              onSaved={setSelected}
               key={`${selected}-${unit?.revision ?? 0}`}
             />
           ) : null}
@@ -215,7 +216,7 @@ export function Inventory(shared: Shared) {
     </>
   );
 }
-function UnitEditor({ data, run, pending, unit }: Shared & { unit?: Unit }) {
+function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Unit; onSaved: (id: string) => void }) {
   const prices = data.prices.find((p) => p.unitId === unit?.id);
   const id = unit ? { id: unit.id, revision: unit.revision } : {};
   return (
@@ -227,9 +228,10 @@ function UnitEditor({ data, run, pending, unit }: Shared & { unit?: Unit }) {
       </h2>
       {data.permissions["inventory.edit"] && (
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            void run("unit", { ...formRecord(e.currentTarget), ...id });
+            const saved = await run("unit", { ...formRecord(e.currentTarget), ...id });
+            if (typeof saved === "string") onSaved(saved);
           }}
           className="space-y-5"
         >

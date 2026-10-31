@@ -224,9 +224,10 @@ export function Crm({ data, run, pending, projectId }: Shared) {
           ) : selected === "new" ? (
             <form
               className="space-y-4"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                void run("lead", formRecord(e.currentTarget));
+                const saved = await run("lead", formRecord(e.currentTarget));
+                if (typeof saved === "string") { setSelected(saved); setActivity(""); }
               }}
             >
               <h2>Create consented enquiry</h2>
