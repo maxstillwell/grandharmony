@@ -25,3 +25,9 @@ Run lint, typecheck, tests and production build before pushing main. `npm run db
 For application rollback, redeploy the previous application commit while retaining additive sales tables and business records. For content rollback, restore a previous approved publication into a new approval-required revision. Use the recorded Neon snapshot/history only for a database incident, after assessing subsequent writes. Never reset or drop business data as a routine rollback.
 
 Earlier feature/Preview work was stopped at the owner's workflow change. Its test records and credentials were not copied into production. Existing test/recovery branches remain untouched and are not release dependencies.
+
+## Production transaction validation — 31 October 2026 (Sydney)
+
+Owner-authorised synthetic inventory, exact-decimal private prices, CRM lead assignment/follow-up and activity CRUD passed against the existing production database. Assertions also verified stale revision rejection and the negative-price constraint. All synthetic writes were inside a deliberately rolled-back PL/pgSQL subtransaction, followed by outer transaction ROLLBACK. An independent subsequent connection confirmed inventory/leads/private prices/events/publications all remained at zero and enquiries stayed disabled. No users, existing business data or publication pointers were changed.
+
+This verifies live SQL constraints and transaction behavior, not authenticated Portal/browser operations or the application's service-layer permission checks. Those remain covered by automated service tests and require a legitimate existing login for live UI acceptance. No session was forged or password reset.

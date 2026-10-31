@@ -8,3 +8,5 @@
 - Keep credentials out of Git, reports and logs. No DNS changes or paid services without an explicit request.
 
 This direct-to-main workflow supersedes older feature-branch/staging/PR release instructions in historical project documentation.
+
+Codex A alone owns shared main pushes, database changes and Production integration for both repositories. Codex B's parallel work is limited to Golfview's isolated Explorer component/assets/geometry/tests; do not duplicate that module. All backend, CRM, permissions, inventory and publication API work remains with A.
