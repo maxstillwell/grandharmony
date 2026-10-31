@@ -15,12 +15,20 @@ export const salesPermissions = [
   "audit.view",
   "settings.edit",
   "crm.export",
+  "deals.view",
+  "deals.edit",
+  "deals.approve",
+  "contracts.edit",
+  "settlement.edit",
 ] as const;
 export type SalesPermission = (typeof salesPermissions)[number];
 const grants: Record<string, readonly SalesPermission[]> = {
   super_admin: salesPermissions,
   management: salesPermissions,
   project_manager: [
+    "deals.view",
+    "deals.edit",
+    "contracts.edit",
     "inventory.view",
     "inventory.edit",
     "publicPrices.edit",
@@ -31,8 +39,19 @@ const grants: Record<string, readonly SalesPermission[]> = {
     "audit.view",
     "crm.export",
   ],
-  finance: ["inventory.view", "prices.view", "prices.edit", "audit.view"],
+  finance: [
+    "deals.view",
+    "contracts.edit",
+    "settlement.edit",
+    "inventory.view",
+    "prices.view",
+    "prices.edit",
+    "audit.view",
+  ],
   sales_manager: [
+    "deals.view",
+    "deals.edit",
+    "contracts.edit",
     "inventory.view",
     "inventory.edit",
     "publicPrices.edit",

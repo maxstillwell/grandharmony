@@ -1,0 +1,14 @@
+{
+  "passed": 7,
+  "tests": [
+    "Browser creates two historical offers, submits and records explicit management acceptance/rejection; inventory is never auto-sold",
+    "Explicit reservation activation synchronizes inventory; conflicting buyer fails atomically; cancellation does not invent automatic release or expiry",
+    "Contract registration uses entered date/price/document reference, signs only on confirmation, preserves asking price and synchronizes the permitted inventory step",
+    "Real PGlite receipts are distinct from contract value; explicit completion/date updates the canonical unit; settlement dashboard reconciles cash and outstanding balance",
+    "CRM preferences persist, lead interest links the canonical residence, buyer-to-inventory opens details/map, and residence-to-deals keeps the unit filter",
+    "390px mobile transaction lists and settlement summaries remain within the viewport",
+    "Inactive feature exposes no transaction forms while V2 inventory works; public snapshot stays empty and no browser exceptions occur"
+  ],
+  "pageErrors": [],
+  "scope": "Loopback browser -> actual services -> isolated PGlite only; not authenticated Production acceptance"
+}

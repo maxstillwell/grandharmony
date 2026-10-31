@@ -34,7 +34,9 @@ export function Field({
           required={required}
           step={step ?? (type === "number" ? "0.01" : undefined)}
           min={type === "number" ? "0" : undefined}
-          data-original-instant={instant ? new Date(instant).toISOString() : undefined}
+          data-original-instant={
+            instant ? new Date(instant).toISOString() : undefined
+          }
           data-original-local={instant ? salesDateInput(instant) : undefined}
         />
       )}
@@ -46,21 +48,26 @@ export function Select({
   label,
   value,
   options,
+  disabled = false,
 }: {
   name: string;
   label: string;
   value?: string | null;
   options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
     <div className="block text-xs text-[#566045]">
-      <label className="mb-2 block" htmlFor={id}>{label}</label>
+      <label className="mb-2 block" htmlFor={id}>
+        {label}
+      </label>
       <select
         id={id}
         className="w-full rounded border border-[#d7d4cc] bg-white p-3 text-sm"
         name={name}
         defaultValue={value ?? ""}
+        disabled={disabled}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -130,6 +137,9 @@ export function formRecord(form: HTMLFormElement) {
     "enquiriesEnabled",
     "consent",
     "marketingConsent",
+    "confirm",
+    "syncInventory",
+    "automationEnabled",
   ])
     row[key] = data.get(key) === "on";
   for (const key of [
@@ -140,14 +150,31 @@ export function formRecord(form: HTMLFormElement) {
     "unitIds",
   ])
     if (data.has(key))
-      row[key] = data.getAll(key).flatMap(value => String(value).split(/\r?\n/))
+      row[key] = data
+        .getAll(key)
+        .flatMap((value) => String(value).split(/\r?\n/))
         .map((x) => x.trim())
         .filter(Boolean);
   // Preserve the exact instant, including seconds and either side of a repeated
   // DST hour, when an existing Sydney datetime input has not been edited.
-  for (const key of ["followUpAt", "depositDueAt", "settlementDueAt"]) {
+  for (const key of [
+    "followUpAt",
+    "depositDueAt",
+    "settlementDueAt",
+    "offeredAt",
+    "expiresAt",
+    "startsAt",
+    "contractDate",
+    "expectedSettlementAt",
+    "actualSettlementAt",
+    "receivedAt",
+  ]) {
     const input = form.elements.namedItem(key);
-    if (input instanceof HTMLInputElement && input.dataset.originalInstant && input.value === input.dataset.originalLocal)
+    if (
+      input instanceof HTMLInputElement &&
+      input.dataset.originalInstant &&
+      input.value === input.dataset.originalLocal
+    )
       row[key] = input.dataset.originalInstant;
   }
   return row;

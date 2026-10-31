@@ -750,3 +750,91 @@ test('residence activity enforces audit permission, exact project scope and no o
  await assert.rejects(service.unitActivity(f.access('sales_manager'),f.projectId,a),/authorised/);
  const other=await fixture();await assert.rejects(service.unitActivity(other.admin,other.projectId,a),/not found/);
 });
+
+const {createLifecycleService,lifecycleEnabled}=require('../lib/sales/lifecycle-service.ts');
+const lifecycleDomain=require('../lib/sales/lifecycle-domain.ts');
+async function lifecycleFixture(){const f=await fixture();const unitId=await service.saveUnit(f.admin,f.projectId,{...input('LIFE-1'),publicVisible:false});const leadId=await service.createLead(f.admin,f.projectId,enquiry());const lead2=await service.createLead(f.admin,f.projectId,{...enquiry(),name:'Second isolated buyer',email:'second@example.invalid'});return {...f,unitId,leadId,lead2,life:createLifecycleService(db)};}
+const baseOffer=f=>({unitId:f.unitId,leadId:f.leadId,amount:'900123.45',offeredAt:'2026-10-01T09:00:00Z',notes:'Isolated lifecycle test'});
+const transition=(revision,status,extra={})=>({revision,status,confirm:true,reason:'Isolated authorised test',...extra});
+test('lifecycle is disabled by default and requires explicit project activation',()=>{
+ const before=process.env.SALES_LIFECYCLE_ENABLED,projects=process.env.SALES_LIFECYCLE_PROJECT_IDS;
+ try{delete process.env.SALES_LIFECYCLE_ENABLED;delete process.env.SALES_LIFECYCLE_PROJECT_IDS;assert.equal(lifecycleEnabled('x'),false);process.env.SALES_LIFECYCLE_ENABLED='true';assert.equal(lifecycleEnabled('x'),false);process.env.SALES_LIFECYCLE_PROJECT_IDS='x';assert.equal(lifecycleEnabled('x'),true);assert.equal(lifecycleEnabled('y'),false);}finally{if(before===undefined)delete process.env.SALES_LIFECYCLE_ENABLED;else process.env.SALES_LIFECYCLE_ENABLED=before;if(projects===undefined)delete process.env.SALES_LIFECYCLE_PROJECT_IDS;else process.env.SALES_LIFECYCLE_PROJECT_IDS=projects;}
+});
+test('multiple offers preserve history; acceptance requires management confirmation and never sells inventory',async()=>{
+ const f=await lifecycleFixture();const first=await f.life.save(f.admin,f.projectId,'offer',baseOffer(f));const second=await f.life.save(f.admin,f.projectId,'offer',{...baseOffer(f),leadId:f.lead2,amount:'910111.22'});
+ await f.life.transition(f.admin,f.projectId,'offer',first,transition(1,'submitted'));
+ await assert.rejects(f.life.transition(f.access('sales_manager'),f.projectId,'offer',first,transition(2,'accepted')),/authorised/);
+ await assert.rejects(f.life.transition(f.admin,f.projectId,'offer',first,{revision:2,status:'accepted',reason:'No confirmation'}),/confirmation/);
+ await f.life.transition(f.admin,f.projectId,'offer',first,transition(2,'accepted'));assert.equal((await current(f.unitId)).status,'not_released');assert.equal((await f.life.workspace(f.admin,f.projectId)).offers.length,2);
+ await f.life.transition(f.admin,f.projectId,'offer',second,transition(1,'submitted'));await f.life.transition(f.admin,f.projectId,'offer',second,transition(2,'rejected'));
+ assert.equal((await service.publicInventory(f.projectId)).units.length,0);
+});
+test('reservation conflicts, explicit expiry, cancellation and inventory synchronisation are atomic',async()=>{
+ const f=await lifecycleFixture();await service.changeStatus(f.admin,f.projectId,f.unitId,1,'available','Isolated release');
+ const a=await f.life.save(f.admin,f.projectId,'reservation',{unitId:f.unitId,leadId:f.leadId,startsAt:'2026-10-01T09:00:00Z'});
+ const b=await f.life.save(f.admin,f.projectId,'reservation',{unitId:f.unitId,leadId:f.lead2,startsAt:'2026-10-01T09:00:00Z',expiresAt:'2026-10-02T09:00:00Z'});
+ await f.life.transition(f.admin,f.projectId,'reservation',a,transition(1,'active',{syncInventory:true,unitRevision:2}));assert.equal((await current(f.unitId)).status,'reserved');
+ await assert.rejects(f.life.transition(f.admin,f.projectId,'reservation',b,transition(1,'active')),/Conflicting/);
+ await f.life.transition(f.admin,f.projectId,'reservation',a,transition(2,'cancelled'));assert.equal((await current(f.unitId)).status,'reserved');
+ await f.life.transition(f.admin,f.projectId,'reservation',b,transition(1,'active'));const w=await f.life.workspace(f.admin,f.projectId);assert.equal(w.reservations.find(r=>r.id===a).expiresAt,null);assert.equal(w.reservations.find(r=>r.id===b).status,'active');
+});
+test('contracts require entered evidence and price; signing preserves asking price and cash is separate',async()=>{
+ const f=await lifecycleFixture();await service.savePrices(f.admin,f.projectId,f.unitId,1,{askingPrice:'1234567.89',minimumPrice:'1000000.00'});
+ const c=await f.life.save(f.admin,f.projectId,'contract',{unitId:f.unitId,leadId:f.leadId});
+ await assert.rejects(f.life.transition(f.admin,f.projectId,'contract',c,transition(1,'signed',{unitRevision:2})),/explicit agreed price/);
+ await f.life.save(f.admin,f.projectId,'contract',{id:c,revision:1,unitId:f.unitId,leadId:f.leadId,contractDate:'2026-10-01T09:00:00Z',contractPrice:'900123.45',depositAmount:'90000.00',documentReference:'Private contract reference, isolated test',expectedSettlementAt:'2026-10-20T09:00:00Z'});
+ await f.life.transition(f.admin,f.projectId,'contract',c,transition(2,'signed',{unitRevision:2}));
+ const w=await service.workspace(f.admin,f.projectId);assert.equal(w.prices[0].askingPrice,'1234567.89');assert.equal(w.prices[0].minimumPrice,'1000000.00');assert.equal(w.prices[0].contractPrice,'900123.45');assert.equal((await current(f.unitId)).status,'not_released');
+ const privateData=await f.life.workspace(f.admin,f.projectId),redacted=await f.life.workspace(f.access('sales_manager'),f.projectId);assert.equal(redacted.contracts[0].contractPrice,null);assert.ok(!JSON.stringify(redacted).includes('900123.45'));
+ const summary=lifecycleDomain.settlementSummary(privateData.contracts,new Date('2026-10-31T00:00:00Z'));assert.equal(summary.contracted,'900123.45');assert.equal(summary.confirmedReceipts,'0.00');assert.equal(summary.overdueSettlements,1);
+ await f.life.receipt(f.admin,f.projectId,c,{revision:3,kind:'deposit',amount:'90000.00',receivedAt:'2026-10-02T09:00:00Z',receiptReference:'Private deposit receipt',confirm:true});
+ let cash=await f.life.workspace(f.admin,f.projectId);assert.equal(lifecycleDomain.settlementSummary(cash.contracts).confirmedReceipts,'90000.00');
+ await assert.rejects(f.life.receipt(f.admin,f.projectId,c,{revision:4,kind:'settlement',amount:'900123.45',receivedAt:'2026-10-20T09:00:00Z',receiptReference:'Too much',confirm:true}),/exceed/);
+ await f.life.receipt(f.admin,f.projectId,c,{revision:4,kind:'settlement',amount:'810123.45',receivedAt:'2026-10-20T09:00:00Z',receiptReference:'Private balance receipt',confirm:true});
+ await f.life.transition(f.admin,f.projectId,'contract',c,transition(5,'unconditional'));await assert.rejects(f.life.transition(f.admin,f.projectId,'contract',c,transition(6,'completed')),/Actual settlement date/);
+ await f.life.transition(f.admin,f.projectId,'contract',c,transition(6,'completed',{actualSettlementAt:'2026-10-20T09:00:00Z'}));cash=await f.life.workspace(f.admin,f.projectId);assert.equal(lifecycleDomain.settlementSummary(cash.contracts).outstandingContractBalance,'0.00');assert.equal(lifecycleDomain.settlementSummary(cash.contracts).completed,1);
+ assert.ok(!(await service.exportCsv(f.admin,f.projectId,'inventory')).includes('900123.45'));assert.equal((await service.publicInventory(f.projectId)).units.length,0);
+});
+test('lifecycle project scope, external agents, revisions and private audit channels cannot be bypassed',async()=>{
+ const f=await lifecycleFixture(),other=await lifecycleFixture();const id=await f.life.save(f.admin,f.projectId,'offer',baseOffer(f));
+ await assert.rejects(f.life.workspace(f.agent,f.projectId),/authorised/);await assert.rejects(f.life.save(f.agent,f.projectId,'offer',baseOffer(f)),/authorised/);
+ await assert.rejects(f.life.save(f.admin,f.projectId,'offer',{...baseOffer(f),unitId:other.unitId}),/belong/);
+ await assert.rejects(f.life.transition(other.admin,other.projectId,'offer',id,transition(1,'submitted')),/not found/);
+ await f.life.transition(f.admin,f.projectId,'offer',id,transition(1,'submitted'));await assert.rejects(f.life.transition(f.admin,f.projectId,'offer',id,transition(1,'accepted')),/changed/);
+ await service.updateLead(f.admin,f.projectId,f.leadId,1,{status:'contacted',assignedAgentId:f.agentId});const history=await service.leadActivity(f.agent,f.projectId,f.leadId);assert.ok(history.every(e=>!e.action.startsWith('lifecycle.')));
+ const logs=(await db.select().from(s.auditLogs)).filter(l=>l.action.startsWith('sales.lifecycle.'));assert.ok(logs.length>0);assert.ok(logs.every(l=>!JSON.stringify(l.metadata).includes('900123.45')));
+});
+test('buyer preferences and policy proposals are explicit, revisioned and never enable automatic rules',async()=>{
+ const f=await lifecycleFixture();await f.life.buyerProfile(f.admin,f.projectId,{leadId:f.leadId,revision:0,preferredBedrooms:'4',budgetMin:'800000.00',budgetMax:'1000000.00',nextAction:'Owner-supplied next action'});
+ await assert.rejects(f.life.buyerProfile(f.admin,f.projectId,{leadId:f.leadId,revision:0,nextAction:'Stale'}),/changed/);
+ await assert.rejects(f.life.buyerProfile(f.admin,f.projectId,{leadId:f.leadId,revision:1,budgetMin:'2.00',budgetMax:'1.00'}),/reversed/);
+ await f.life.policy(f.admin,f.projectId,{});let w=await f.life.workspace(f.admin,f.projectId);assert.equal(w.settings.proposedDurationHours,null);assert.equal(w.settings.proposedReservationFee,null);assert.equal(w.settings.automationEnabled,false);assert.equal(w.profiles[0].preferredBedrooms,4);
+ await assert.rejects(f.life.policy(f.admin,f.projectId,{automationEnabled:true}),/not approved/);
+});
+
+test('cancelled contracts retain confirmed cash evidence and never imply refunds',()=>{
+ const c={status:'cancelled',contractPrice:'100000.00',depositAmount:'10000.00',depositReceivedAmount:'10000.00',settlementReceivedAmount:null,expectedSettlementAt:null,actualSettlementAt:null};
+ const r=lifecycleDomain.settlementSummary([c]);assert.equal(r.contracted,'0.00');assert.equal(r.confirmedReceipts,'10000.00');assert.equal(r.cancelledContractReceipts,'10000.00');assert.equal(r.outstandingContractBalance,'0.00');
+});
+test('0006 is additive and preserves a populated legacy 47-unit inventory including private asking prices',async()=>{
+ const local=new PGlite();await local.waitReady;try{
+ const journal=JSON.parse(fs.readFileSync('drizzle/meta/_journal.json','utf8'));for(const e of journal.entries.filter(e=>e.idx<6))await local.exec(fs.readFileSync(`drizzle/${e.tag}.sql`,'utf8'));
+ const p=randomUUID(),u=randomUUID();await local.query('insert into users(id,email) values($1,$2)',[u,'migration-only@example.invalid']);await local.query('insert into projects(id,name,slug) values($1,$2,$3)',[p,'Migration fixture',p]);
+ for(let n=1;n<=47;n++){const id=randomUUID();await local.query('insert into sales_units(id,project_id,number,source_document,updated_by_user_id) values($1,$2,$3,$4,$5)',[id,p,String(n),'Isolated migration preservation',u]);await local.query('insert into sales_private_prices(unit_id,asking_price) values($1,$2)',[id,'1234567.89']);}
+ const hash=async()=>JSON.stringify((await local.query('select to_jsonb(u) as unit,to_jsonb(p) as price from sales_units u join sales_private_prices p on p.unit_id=u.id order by u.id')).rows);
+ const before=await hash();await local.exec(fs.readFileSync('drizzle/0006_sales_lifecycle.sql','utf8'));assert.equal(await hash(),before);
+ for(const name of ['sales_offers','sales_reservations','sales_contracts','sales_buyer_profiles','sales_lifecycle_settings'])assert.equal((await local.query(`select count(*)::int as n from ${name}`)).rows[0].n,0);
+ }finally{await local.close();}
+});
+
+test('default-off server action rejects lifecycle writes before opening a production database',async()=>{
+ const Module=require('node:module'),file=require('node:path').resolve('lib/sales/actions.ts'),f=await fixture();const m=new Module(file,module);m.filename=file;m.paths=module.paths;const normal=m.require.bind(m);let queries=0;
+ m.require=(id)=>id==='../auth/guards'?{requirePortalAccess:async()=>f.admin}:id==='./db'?{getSalesDb:()=>{queries++;throw Error('Must not open a production connection')}}:id==='next/cache'?{revalidatePath:()=>{}}:normal(id);
+ const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;m._compile(code,file);
+ const before=process.env.SALES_LIFECYCLE_ENABLED;try{delete process.env.SALES_LIFECYCLE_ENABLED;const result=await m.exports.salesAction(f.projectId,'lifecycle.save',{kind:'offer',...baseOffer(f)});assert.equal(result.ok,false);assert.match(result.error,/not activated/);assert.equal(queries,0);}finally{if(before===undefined)delete process.env.SALES_LIFECYCLE_ENABLED;else process.env.SALES_LIFECYCLE_ENABLED=before;}
+});
+test('invalid inventory synchronization rolls back contract signature, private prices, revisions and audit together',async()=>{
+ const f=await lifecycleFixture();await service.savePrices(f.admin,f.projectId,f.unitId,1,{askingPrice:'1100000.00'});const c=await f.life.save(f.admin,f.projectId,'contract',{unitId:f.unitId,leadId:f.leadId,contractPrice:'900000.00',contractDate:'2026-10-01T09:00:00Z',documentReference:'Isolated document'});
+ await assert.rejects(f.life.transition(f.admin,f.projectId,'contract',c,transition(1,'signed',{unitRevision:2,syncInventory:true})),/transition/);
+ const w=await service.workspace(f.admin,f.projectId),l=await f.life.workspace(f.admin,f.projectId);assert.equal(w.prices[0].contractPrice,null);assert.equal(w.prices[0].askingPrice,'1100000.00');assert.equal(w.units[0].revision,2);assert.equal(w.units[0].status,'not_released');assert.equal(l.contracts[0].status,'draft');assert.equal(l.contracts[0].revision,1);assert.ok(!l.history.some(e=>e.action==='lifecycle.contract.status'));
+});

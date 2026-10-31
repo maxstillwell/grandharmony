@@ -11,3 +11,7 @@ test('read-only preflight recognises historical CRLF hashes without rewriting mi
   observed.applied[0].created_at='100';observed.columns=[];assert.equal(migrationEvidence(observed,dir).migrations[0].state,'journal-schema-mismatch');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('an owner-unapproved additive migration is reported pending rather than corrupting the corporate baseline',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gh-pending-migration-'));try{fs.mkdirSync(path.join(dir,'meta'));const sql='CREATE TABLE "later" (\n "id" uuid\n);\n';fs.writeFileSync(path.join(dir,'0006_later.sql'),sql);fs.writeFileSync(path.join(dir,'meta/_journal.json'),JSON.stringify({entries:[{tag:'0006_later',when:123}]}));const result=migrationEvidence({tables:[],columns:[],indexes:[],constraints:[],triggers:[],enums:[],applied:[]},dir);assert.equal(result.baselineConsistent,true);assert.equal(result.appliedConsistent,true);assert.deepEqual(result.pendingMigrations,['0006_later']);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

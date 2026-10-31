@@ -94,3 +94,139 @@ export const salesEvents = pgTable("sales_events", {
 export const salesRateLimits = pgTable("sales_rate_limits", {
   key: text("key").primaryKey(), bucket: integer("bucket").notNull(), count: integer("count").notNull(), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, t => [index("sales_rate_limits_expiry_idx").on(t.expiresAt)]);
+
+// V3 lifecycle: additive tables only. Production access stays feature-gated until
+// the owner approves 0006 and explicitly activates the project workflow.
+export const salesBuyerProfiles = pgTable("sales_buyer_profiles", {
+  leadId: uuid("lead_id")
+    .primaryKey()
+    .references(() => salesLeads.id, { onDelete: "restrict" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "restrict" }),
+  preferredBedrooms: integer("preferred_bedrooms"),
+  budgetMin: numeric("budget_min", { precision: 14, scale: 2 }),
+  budgetMax: numeric("budget_max", { precision: 14, scale: 2 }),
+  nextAction: text("next_action"),
+  revision: integer("revision").default(1).notNull(),
+  updatedByUserId: uuid("updated_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  ...timestamps,
+});
+export const salesOffers = pgTable("sales_offers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  unitId: uuid("unit_id")
+    .notNull()
+    .references(() => salesUnits.id),
+  leadId: uuid("lead_id")
+    .notNull()
+    .references(() => salesLeads.id),
+  agentId: uuid("agent_id").references(() => users.id),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  offeredAt: timestamp("offered_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  status: text("status").default("draft").notNull(),
+  conditions: text("conditions"),
+  notes: text("notes"),
+  documentReference: text("document_reference"),
+  revision: integer("revision").default(1).notNull(),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  updatedByUserId: uuid("updated_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  ...timestamps,
+});
+export const salesReservations = pgTable("sales_reservations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  unitId: uuid("unit_id")
+    .notNull()
+    .references(() => salesUnits.id),
+  leadId: uuid("lead_id")
+    .notNull()
+    .references(() => salesLeads.id),
+  offerId: uuid("offer_id").references(() => salesOffers.id),
+  agentId: uuid("agent_id").references(() => users.id),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  status: text("status").default("draft").notNull(),
+  notes: text("notes"),
+  revision: integer("revision").default(1).notNull(),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  updatedByUserId: uuid("updated_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  ...timestamps,
+});
+export const salesContracts = pgTable("sales_contracts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  unitId: uuid("unit_id")
+    .notNull()
+    .references(() => salesUnits.id),
+  leadId: uuid("lead_id")
+    .notNull()
+    .references(() => salesLeads.id),
+  offerId: uuid("offer_id").references(() => salesOffers.id),
+  reservationId: uuid("reservation_id").references(() => salesReservations.id),
+  agentId: uuid("agent_id").references(() => users.id),
+  status: text("status").default("draft").notNull(),
+  contractDate: timestamp("contract_date", { withTimezone: true }),
+  contractPrice: numeric("contract_price", { precision: 14, scale: 2 }),
+  depositAmount: numeric("deposit_amount", { precision: 14, scale: 2 }),
+  depositReceivedAmount: numeric("deposit_received_amount", {
+    precision: 14,
+    scale: 2,
+  }),
+  depositReceivedAt: timestamp("deposit_received_at", { withTimezone: true }),
+  expectedSettlementAt: timestamp("expected_settlement_at", {
+    withTimezone: true,
+  }),
+  actualSettlementAt: timestamp("actual_settlement_at", { withTimezone: true }),
+  settlementReceivedAmount: numeric("settlement_received_amount", {
+    precision: 14,
+    scale: 2,
+  }),
+  settlementReceivedAt: timestamp("settlement_received_at", {
+    withTimezone: true,
+  }),
+  documentReference: text("document_reference"),
+  receiptReference: text("receipt_reference"),
+  notes: text("notes"),
+  revision: integer("revision").default(1).notNull(),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  updatedByUserId: uuid("updated_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  ...timestamps,
+});
+export const salesLifecycleSettings = pgTable("sales_lifecycle_settings", {
+  projectId: uuid("project_id")
+    .primaryKey()
+    .references(() => projects.id),
+  proposedDurationHours: integer("proposed_duration_hours"),
+  proposedReservationFee: numeric("proposed_reservation_fee", {
+    precision: 14,
+    scale: 2,
+  }),
+  automationEnabled: boolean("automation_enabled").default(false).notNull(),
+  notes: text("notes"),
+  updatedByUserId: uuid("updated_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  ...timestamps,
+});

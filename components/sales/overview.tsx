@@ -3,7 +3,7 @@ import type { Shared } from "./types";
 import { date, label } from "./forms";
 import { statusPresentation } from "./inventory-status";
 import { displaySalesDate } from "@/lib/sales/dates";
-export function Overview({ data }: Shared) {
+export function Overview({ data, lifecycle, onOpenLifecycle }: Shared) {
   if (data.agent)
     return (
       <section className="portal-card">
@@ -38,6 +38,53 @@ export function Overview({ data }: Shared) {
   ];
   return (
     <>
+      {data.permissions["deals.view"] && (
+        <section className="portal-card">
+          <h2>Sales lifecycle</h2>
+          {lifecycle?.enabled && lifecycle.data ? (
+            <>
+              <p className="portal-helper">
+                {
+                  lifecycle.data.offers.filter((r) => r.status === "submitted")
+                    .length
+                }{" "}
+                submitted offers ·{" "}
+                {
+                  lifecycle.data.reservations.filter(
+                    (r) => r.status === "active",
+                  ).length
+                }{" "}
+                active reservations ·{" "}
+                {
+                  lifecycle.data.contracts.filter((r) =>
+                    ["signed", "unconditional"].includes(r.status),
+                  ).length
+                }{" "}
+                signed / unconditional contracts.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="portal-button"
+                  onClick={() => onOpenLifecycle?.("Deals")}
+                >
+                  Open deals
+                </button>
+                <button
+                  className="portal-button"
+                  onClick={() => onOpenLifecycle?.("Settlement Tracking")}
+                >
+                  Settlement tracking
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="portal-helper">
+              Transactions are not activated. Existing inventory, CRM, pricing
+              and publication controls remain available.
+            </p>
+          )}
+        </section>
+      )}
       <section className="portal-card">
         <h2>Inventory by status</h2>
         <div className="mt-4 flex flex-wrap gap-5">

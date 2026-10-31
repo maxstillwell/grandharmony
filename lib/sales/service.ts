@@ -937,6 +937,7 @@ export function createSalesService(db: SalesDb) {
           and(
             eq(s.salesEvents.projectId, projectId),
             eq(s.salesEvents.leadId, id),
+            sql`${s.salesEvents.action} not like 'lifecycle.%'`,
           ),
         )
         .orderBy(desc(s.salesEvents.createdAt));
@@ -1109,6 +1110,11 @@ export function createSalesService(db: SalesDb) {
             "audit.view",
             "settings.edit",
             "crm.export",
+            "deals.view",
+            "deals.edit",
+            "deals.approve",
+            "contracts.edit",
+            "settlement.edit",
           ].map((permission) => [
             permission,
             canSales(
@@ -1175,3 +1181,6 @@ export function createSalesService(db: SalesDb) {
     },
   };
 }
+
+// Shared audit writer: transaction-scoped, no confidential values in shared logs.
+export { event as recordSalesEvent };

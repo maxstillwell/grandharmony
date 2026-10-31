@@ -10,6 +10,7 @@ import sourcePlan from "@/assets/sales/golfview-review/plan.json";
 import { createSalesService } from "@/lib/sales/service";
 import { getSalesDb } from "@/lib/sales/db";
 import { SalesWorkspace } from "@/components/sales/workspace";
+import { loadLifecycle } from "@/lib/sales/lifecycle-access";
 
 export const metadata = { title: "Sales Management | Grand Harmony" };
 export default async function SalesManagement({
@@ -57,6 +58,7 @@ export default async function SalesManagement({
     <SalesWorkspace
       key={project.id}
       data={data}
+      lifecycle={await loadLifecycle(access, project.id)}
       projectId={project.id}
       projectName={salesProjectName(project)}
       reviewPlan={

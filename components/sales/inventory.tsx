@@ -31,9 +31,13 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
   const [localSelected, setLocalSelected] = useState<string | null>(null);
   const selected = shared.selectedUnitId ?? localSelected;
   const setSelected = shared.onSelectUnit ?? setLocalSelected;
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(
+    shared.openUnitId ?? null,
+  );
   const panelOpener = useRef<HTMLElement | null>(null);
-  const [showMap, setShowMap] = useState(Boolean(shared.mapOnly));
+  const [showMap, setShowMap] = useState(
+    Boolean(shared.mapOnly || shared.openUnitId),
+  );
   const published = new Set(data.publicData?.units.map((u) => u.id) ?? []);
   const filtered = data.units.filter(
     (u) =>
@@ -104,6 +108,7 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
   };
   const closeResidence = () => {
     setEditing(null);
+    shared.onClearOpenUnit?.();
     const opener = panelOpener.current;
     requestAnimationFrame(() => {
       if (opener?.isConnected) opener.focus({ preventScroll: true });

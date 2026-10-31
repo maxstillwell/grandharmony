@@ -30,6 +30,6 @@ function migrationEvidence(observed, directory='drizzle') {
     const state=recordedApplied||equivalent?(missingCount?'journal-schema-mismatch':equivalent?'recorded-equivalent-line-endings':'recorded-and-observed'):(present?'objects-without-matching-journal':'not-applied');
     return {tag:entry.tag,sha256:hash,recordedApplied,recordedHash:recordedApplied?hash:equivalent?crlfHash:null,lineEndingEquivalent:equivalent,state,missing};
   });
-  return {migrations,unknownJournalHashes:applied.filter(row=>!migrations.some(m=>m.recordedHash===row.hash)).map(row=>row.hash),baselineConsistent:migrations.filter(m=>!m.tag.startsWith('0005')).every(m=>['recorded-and-observed','recorded-equivalent-line-endings'].includes(m.state))};
+  return {migrations,pendingMigrations:migrations.filter(m=>m.state==='not-applied').map(m=>m.tag),appliedConsistent:migrations.filter(m=>m.recordedApplied||m.lineEndingEquivalent).every(m=>['recorded-and-observed','recorded-equivalent-line-endings'].includes(m.state)),unknownJournalHashes:applied.filter(row=>!migrations.some(m=>m.recordedHash===row.hash)).map(row=>row.hash),baselineConsistent:migrations.filter(m=>Number(m.tag.slice(0,4))<5).every(m=>['recorded-and-observed','recorded-equivalent-line-endings'].includes(m.state))};
 }
 module.exports={expectedObjects,migrationEvidence};

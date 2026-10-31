@@ -175,6 +175,73 @@ export function ResidencePanel({
               publishes a listing. Contract prices are recorded only for genuine
               agreed transactions.
             </p>
+            {shared.data.permissions["deals.view"] && (
+              <section className="mt-6">
+                <h3>Offers, reservations and contracts</h3>
+                {shared.lifecycle?.enabled && shared.lifecycle.data ? (
+                  <>
+                    <p className="portal-helper">
+                      {
+                        shared.lifecycle.data.offers.filter(
+                          (r) => r.unitId === unit.id,
+                        ).length
+                      }{" "}
+                      offers ·{" "}
+                      {
+                        shared.lifecycle.data.reservations.filter(
+                          (r) => r.unitId === unit.id && r.status === "active",
+                        ).length
+                      }{" "}
+                      active reservations ·{" "}
+                      {
+                        shared.lifecycle.data.contracts.filter(
+                          (r) => r.unitId === unit.id,
+                        ).length
+                      }{" "}
+                      contract records.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="portal-button"
+                        onClick={() => {
+                          onClose();
+                          shared.onOpenLifecycle?.("Deals", unit.id, null);
+                        }}
+                      >
+                        Open residence deals
+                      </button>
+                      <button
+                        className="portal-button"
+                        onClick={() => {
+                          onClose();
+                          shared.onOpenLifecycle?.("Contracts", unit.id, null);
+                        }}
+                      >
+                        Open residence contracts
+                      </button>
+                      <button
+                        className="portal-button"
+                        onClick={() => {
+                          onClose();
+                          shared.onOpenLifecycle?.(
+                            "Settlement Tracking",
+                            unit.id,
+                            null,
+                          );
+                        }}
+                      >
+                        Settlement progress
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="portal-helper">
+                    Transaction entry is not activated. Inventory, CRM and
+                    publication controls remain independent.
+                  </p>
+                )}
+              </section>
+            )}
             <h3 className="mt-6">Features and internal notes</h3>
             <p>{unit.features.join(" · ") || "—"}</p>
             <p className="mt-3 whitespace-pre-wrap">

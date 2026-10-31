@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Data, Shared } from "./types";
 import { leadStatuses } from "@/lib/sales/domain";
 import { displaySalesDate } from "@/lib/sales/dates";
+import { BuyerPreferences } from "./lifecycle";
 import { UnitChoices } from "./unit-choices";
 import {
   Area,
@@ -20,9 +21,12 @@ export function Crm({
   pending,
   projectId,
   initialLeadId = null,
+  ...sharedExtra
 }: Shared & { initialLeadId?: string | null }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [followFilter, setFollowFilter] = useState("");
+  const [sort, setSort] = useState("updated");
   const [selected, setSelected] = useState<string | null>(initialLeadId);
   const [activity, setActivity] = useState<Data["history"] | null>(null);
   const leads = data.leads.filter(
@@ -30,7 +34,25 @@ export function Crm({
       `${l.name} ${l.email} ${l.phone ?? ""}`
         .toLowerCase()
         .includes(search.toLowerCase()) &&
-      (!status || l.status === status),
+      (!status || l.status === status) &&
+      (!followFilter ||
+        (followFilter === "due"
+          ? l.followUpAt &&
+            new Date(l.followUpAt) <= new Date() &&
+            !["converted", "lost", "archived"].includes(l.status)
+          : followFilter === "scheduled"
+            ? Boolean(l.followUpAt)
+            : !l.followUpAt)),
+  );
+  leads.sort((a, b) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name)
+      : sort === "followup"
+        ? (a.followUpAt ? new Date(a.followUpAt).getTime() : Infinity) -
+            (b.followUpAt ? new Date(b.followUpAt).getTime() : Infinity) ||
+          a.name.localeCompare(b.name)
+        : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0) -
+          (a.updatedAt ? new Date(a.updatedAt).getTime() : 0),
   );
   const lead = data.leads.find((l) => l.id === selected);
   const leadId = lead?.id,
@@ -96,11 +118,47 @@ export function Crm({
             </button>
           )}
         </div>
+        <div className="mb-5 flex flex-wrap gap-4">
+          <label className="text-xs">
+            Follow-up filter
+            <select
+              aria-label="Follow-up filter"
+              className="ml-2 border p-2"
+              value={followFilter}
+              onChange={(e) => setFollowFilter(e.target.value)}
+            >
+              <option value="">All follow-ups</option>
+              <option value="due">Due / overdue</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="missing">No follow-up scheduled</option>
+            </select>
+          </label>
+          <label className="text-xs">
+            Lead order
+            <select
+              aria-label="Lead order"
+              className="ml-2 border p-2"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="updated">Recently updated</option>
+              <option value="followup">Follow-up soonest</option>
+              <option value="name">Buyer name</option>
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr>
-                {["Name", "Contact", "Status", "Follow-up", ""].map((h, i) => (
+                {[
+                  "Name",
+                  "Contact",
+                  "Source / assigned agent",
+                  "Status",
+                  "Follow-up",
+                  "",
+                ].map((h, i) => (
                   <th className="p-3" key={i}>
                     {h}
                   </th>
@@ -115,6 +173,14 @@ export function Crm({
                     {l.email}
                     <br />
                     {l.phone}
+                  </td>
+                  <td>
+                    {l.source}
+                    <small className="block text-xs">
+                      {data.assignees.find((a) => a.id === l.assignedAgentId)
+                        ?.name ??
+                        (l.assignedAgentId ? "Assigned agent" : "Unassigned")}
+                    </small>
                   </td>
                   <td>{label(l.status)}</td>
                   <td>
@@ -158,6 +224,24 @@ export function Crm({
                 {lead.marketingConsent ? "Yes" : "No"} · Preferred contact:{" "}
                 {lead.contactPreference}
               </p>
+              <div className="my-4 flex flex-wrap gap-2">
+                {lead.unitIds.map((id) => {
+                  const unit = data.units.find((u) => u.id === id);
+                  return unit && sharedExtra.onOpenUnit ? (
+                    <button
+                      className="portal-button"
+                      key={id}
+                      onClick={() => sharedExtra.onOpenUnit?.(id)}
+                    >
+                      Open Residence {unit.number}
+                    </button>
+                  ) : null;
+                })}
+              </div>
+              <BuyerPreferences
+                shared={{ data, run, pending, projectId, ...sharedExtra }}
+                leadId={lead.id}
+              />
               {data.permissions["crm.edit"] && (
                 <form
                   key={`${lead.id}-${lead.revision}`}

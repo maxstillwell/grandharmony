@@ -10,6 +10,8 @@ import { Stages } from "./stages";
 import { Import } from "./inventory-import";
 import { Publishing } from "./publishing";
 import { Settings } from "./settings";
+import { LifecycleWorkspace, LifecyclePolicy } from "./lifecycle";
+import type { LifecycleState } from "@/lib/sales/lifecycle-access";
 import { Crm } from "./crm";
 export function SalesWorkspace({
   data,
@@ -17,15 +19,22 @@ export function SalesWorkspace({
   projectName,
   projects = [],
   reviewPlan,
+  lifecycle = { enabled: false, data: null },
 }: {
   data: Data;
   projectId: string;
   projectName: string;
   projects?: Array<{ id: string; name: string }>;
   reviewPlan?: ManagementPlan;
+  lifecycle?: LifecycleState;
 }) {
   const [tab, setTab] = useState("Overview");
   const [selectedUnitId, onSelectUnit] = useState<string | null>(null);
+  const [openUnitId, setOpenUnitId] = useState<string | null>(null);
+  const [transactionFilter, setTransactionFilter] = useState<{
+    unitId: string | null;
+    leadId: string | null;
+  }>({ unitId: null, leadId: null });
   const [crmLeadId, setCrmLeadId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -78,7 +87,27 @@ export function SalesWorkspace({
     reviewPlan,
     selectedUnitId,
     onSelectUnit,
+    lifecycle,
+    openUnitId,
+    onOpenUnit: (id: string) => {
+      onSelectUnit(id);
+      setOpenUnitId(id);
+      setTab("Inventory");
+    },
+    onClearOpenUnit: () => setOpenUnitId(null),
+    onOpenLifecycle: (
+      area: string,
+      unitId: string | null = null,
+      leadId: string | null = null,
+    ) => {
+      setTransactionFilter({ unitId, leadId });
+      setTab(area);
+    },
     feedback: { message, failed },
+    clearFeedback: () => {
+      setMessage("");
+      setFailed(false);
+    },
     onOpenLead: (id: string) => {
       setCrmLeadId(id);
       setTab("Leads / CRM");
@@ -88,11 +117,16 @@ export function SalesWorkspace({
     "Overview",
     "Inventory",
     ...(!data.agent ? ["Explorer / Map"] : []),
-    ...(data.permissions["inventory.edit"] ? ["Stages", "Import"] : []),
+    ...(data.permissions["inventory.edit"]
+      ? ["Pricing / Releases", "Import"]
+      : []),
     ...(data.publications.length || data.permissions["inventory.edit"]
       ? ["Publishing"]
       : []),
     ...(data.permissions["crm.view"] ? ["Leads / CRM"] : []),
+    ...(data.permissions["deals.view"]
+      ? ["Deals", "Contracts", "Settlement Tracking"]
+      : []),
     ...(data.permissions["audit.view"] ? ["Activity / Audit"] : []),
     ...(data.permissions["settings.edit"] ? ["Settings"] : []),
   ];
@@ -167,13 +201,28 @@ export function SalesWorkspace({
         {tab === "Overview" && <Overview {...shared} />}
         {tab === "Inventory" && <Inventory {...shared} />}
         {tab === "Explorer / Map" && <Inventory {...shared} mapOnly />}
-        {tab === "Stages" && <Stages {...shared} />}
+        {tab === "Pricing / Releases" && <Stages {...shared} />}
         {tab === "Import" && <Import {...shared} />}
         {tab === "Publishing" && <Publishing {...shared} />}
         {tab === "Leads / CRM" && (
           <Crm {...shared} key={crmLeadId ?? "crm"} initialLeadId={crmLeadId} />
         )}
-        {tab === "Settings" && <Settings {...shared} />}
+        {tab === "Settings" && (
+          <>
+            <Settings {...shared} />
+            <LifecyclePolicy shared={shared} />
+          </>
+        )}
+        {["Deals", "Contracts", "Settlement Tracking"].includes(tab) && (
+          <LifecycleWorkspace
+            key={`${tab}-${transactionFilter.unitId}-${transactionFilter.leadId}`}
+            shared={shared}
+            state={lifecycle}
+            area={tab}
+            unitFilter={transactionFilter.unitId}
+            leadFilter={transactionFilter.leadId}
+          />
+        )}
         {tab === "Activity / Audit" && (
           <section className="portal-card">
             <h2>Inventory and publication history</h2>

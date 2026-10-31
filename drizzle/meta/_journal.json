@@ -43,6 +43,13 @@
       "when": 1793413165620,
       "tag": "0005_sales_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793449000000,
+      "tag": "0006_sales_lifecycle",
+      "breakpoints": true
     }
   ]
 }

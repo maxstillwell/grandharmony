@@ -4,6 +4,11 @@ import { requirePortalAccess } from "../auth/guards";
 import { getSalesDb } from "./db";
 import { createSalesService } from "./service";
 import { record, validId } from "./domain";
+import {
+  createLifecycleService,
+  lifecycleEnabled,
+  type TransactionKind,
+} from "./lifecycle-service";
 import { revalidatePath } from "next/cache";
 
 export async function salesAction(
@@ -14,6 +19,43 @@ export async function salesAction(
   const access = await requirePortalAccess();
   if (!validId(projectId)) return { ok: false, error: "Invalid project." };
   try {
+    if (operation.startsWith("lifecycle.")) {
+      if (!lifecycleEnabled(projectId))
+        return {
+          ok: false,
+          error: "Transaction entry is not activated for this project.",
+        };
+      const lifecycle = createLifecycleService(getSalesDb()),
+        row = record(input);
+      const kind = String(row.kind) as TransactionKind;
+      if (
+        ["lifecycle.save", "lifecycle.transition"].includes(operation) &&
+        !["offer", "reservation", "contract"].includes(kind)
+      )
+        throw new Error("Invalid transaction kind.");
+      const data =
+        operation === "lifecycle.save"
+          ? await lifecycle.save(access, projectId, kind, row)
+          : operation === "lifecycle.transition"
+            ? await lifecycle.transition(
+                access,
+                projectId,
+                kind,
+                String(row.id),
+                row,
+              )
+            : operation === "lifecycle.receipt"
+              ? await lifecycle.receipt(access, projectId, String(row.id), row)
+              : operation === "lifecycle.profile"
+                ? await lifecycle.buyerProfile(access, projectId, row)
+                : operation === "lifecycle.policy"
+                  ? await lifecycle.policy(access, projectId, row)
+                  : undefined;
+      if (data === undefined && operation !== "lifecycle.policy")
+        throw new Error("Unknown transaction operation.");
+      revalidatePath("/portal/sales");
+      return { ok: true, data: data ?? true };
+    }
     const service = createSalesService(getSalesDb());
     const row = record(input);
     let data: unknown;

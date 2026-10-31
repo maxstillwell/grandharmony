@@ -1,0 +1,45 @@
+// Disposable loopback-only integration app. It invokes the real services on PGlite.
+// No production session, credential, connection, schema or records are used.
+import {mkdtemp,mkdir,writeFile,symlink,copyFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {resolve,join} from 'node:path';import {spawn} from 'node:child_process';
+const repo=resolve(import.meta.dirname,'..'),root=await mkdtemp(join(tmpdir(),'gh-lifecycle-e2e-'));
+for(const dir of ['app/portal/sales','app/api/test','app/api/portal/sales/[projectId]/drawing'])await mkdir(join(root,dir),{recursive:true});
+await symlink(join(repo,'node_modules'),join(root,'node_modules'),'dir');await writeFile(join(root,'package.json'),JSON.stringify({name:'loopback-lifecycle-only',private:true}));
+await writeFile(join(root,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',jsx:'preserve',esModuleInterop:true,resolveJsonModule:true,noEmit:true,moduleResolution:'bundler',paths:{'@/*':[repo+'/*']}}}));
+await writeFile(join(root,'postcss.config.mjs'),'export default {plugins:{tailwindcss:{},autoprefixer:{}}};');await writeFile(join(root,'tailwind.config.cjs'),`module.exports={content:[${JSON.stringify(repo+'/components/**/*.{ts,tsx}')},${JSON.stringify(repo+'/app/**/*.{ts,tsx}')}],theme:{extend:{}},plugins:[]};`);
+await writeFile(join(root,'next.config.mjs'),`export default {devIndicators:false,serverExternalPackages:['@electric-sql/pglite'],webpack(c){c.resolve.alias={'@/lib/sales/actions$':${JSON.stringify(join(root,'local-actions.ts'))},'@':${JSON.stringify(repo)},...c.resolve.alias};return c;}};`);
+await writeFile(join(root,'local-actions.ts'),`export async function salesAction(projectId,operation,input){const response=await fetch('/api/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation,input})});const value=await response.json();if(value.snapshot)window.dispatchEvent(new CustomEvent('local-lifecycle-refresh',{detail:value.snapshot}));return value;}`);
+await writeFile(join(root,'app/layout.tsx'),`import ${JSON.stringify(repo+'/app/globals.css')};export default function Layout({children}){return <html lang="en"><body>{children}</body></html>}`);
+await copyFile(join(repo,'assets/sales/golfview-review/masterplan.svg'),join(root,'drawing.svg'));await writeFile(join(root,'app/api/portal/sales/[projectId]/drawing/route.ts'),`import {readFile} from 'node:fs/promises';export async function GET(){return new Response(await readFile(${JSON.stringify(join(root,'drawing.svg'))}),{headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}});}`);
+await writeFile(join(root,'app/api/test/route.ts'),`
+import {PGlite} from '@electric-sql/pglite';import {drizzle} from 'drizzle-orm/pglite';import {readFile} from 'node:fs/promises';import {randomUUID} from 'node:crypto';
+import * as schema from '@/lib/db/schema';import {createSalesService} from '@/lib/sales/service';import {createLifecycleService} from '@/lib/sales/lifecycle-service';import plan from '@/assets/sales/golfview-review/plan.json';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+async function initialize(){const pg=new PGlite();await pg.waitReady;const journal=JSON.parse(await readFile(${JSON.stringify(repo+'/drizzle/meta/_journal.json')},'utf8'));for(const e of journal.entries)await pg.exec(await readFile(${JSON.stringify(repo+'/drizzle/')}+e.tag+'.sql','utf8'));const db=drizzle(pg,{schema}),projectId=randomUUID(),userId=randomUUID();
+await pg.query('insert into users(id,email,is_active) values($1,$2,true)',[userId,'local-lifecycle-owner@example.invalid']);await pg.query('insert into projects(id,name,slug) values($1,$2,$3)',[projectId,'Golfview isolated fixture',projectId]);await pg.query("insert into project_memberships(project_id,user_id,role,can_manage) values($1,$2,'super_admin',true)",[projectId,userId]);
+const access={userId,email:'local-lifecycle-owner@example.invalid',name:'Local owner',role:'super_admin',roles:['super_admin'],projects:[{id:projectId,name:'Golfview',slug:'700-project',membershipRole:'super_admin',canManage:true}]};const service=createSalesService(db),life=createLifecycleService(db);await service.configure(access,projectId,{publicKey:'local-lifecycle-only',expectedUnits:'47',privacyVersion:'local-v3',privacyNotice:'Isolated synthetic consent notice. '.repeat(12)});
+for(let i=1;i<=4;i++){const id=await service.saveUnit(access,projectId,{number:String(i),housingType:'Local type',bedrooms:i%2?4:3,bathrooms:'2',carSpaces:'2',buildingAreaSqm:'200.00',landAreaSqm:'120.00',sourceDocument:'LOCAL SYNTHETIC TEST ONLY',publicVisible:false});await service.savePrices(access,projectId,id,1,{askingPrice:'1100000.00'});}
+for(const name of ['Alpha','Beta'])await service.createLead(access,projectId,{name:'Local Buyer '+name,email:name.toLowerCase()+'@example.invalid',message:'Isolated browser fixture',privacyVersion:'local-v3',consent:true,marketingConsent:false,unitIds:[]});
+return {pg,service,life,projectId,access};}
+async function fixture(){const g=globalThis as any;return await(g.__ghLifecycleTest??=initialize());}
+async function snapshot(f:any){return {projectId:f.projectId,data:await f.service.workspace(f.access,f.projectId),lifecycle:{enabled:true,data:await f.life.workspace(f.access,f.projectId)},plan};}
+export async function DELETE(){const g=globalThis as any;if(g.__ghLifecycleTest){const f=await g.__ghLifecycleTest;await f.pg.close();g.__ghLifecycleTest=undefined;}return Response.json({reset:true});}
+export async function GET(){const f=await fixture();return Response.json(await snapshot(f));}
+export async function POST(request:Request){const f=await fixture();const {operation,input:r}=await request.json();try{let data;
+if(operation==='lifecycle.save')data=await f.life.save(f.access,f.projectId,r.kind,r);
+else if(operation==='lifecycle.transition')data=await f.life.transition(f.access,f.projectId,r.kind,r.id,r);
+else if(operation==='lifecycle.receipt')data=await f.life.receipt(f.access,f.projectId,r.id,r);
+else if(operation==='lifecycle.profile')data=await f.life.buyerProfile(f.access,f.projectId,r);
+else if(operation==='lifecycle.policy')data=await f.life.policy(f.access,f.projectId,r);
+else if(operation==='unit')data=await f.service.saveUnit(f.access,f.projectId,r,r.id,Number(r.revision));
+else if(operation==='status')data=await f.service.changeStatus(f.access,f.projectId,r.id,Number(r.revision),r.status,r.reason);
+else if(operation==='prices'||operation==='publicPrice')data=await f.service.savePrices(f.access,f.projectId,r.id,Number(r.revision),r,operation==='publicPrice');
+else if(operation==='activity')data=await f.service.leadActivity(f.access,f.projectId,r.id);
+else if(operation==='unitActivity')data=await f.service.unitActivity(f.access,f.projectId,r.id);
+else if(operation==='lead')data=r.id?await f.service.updateLead(f.access,f.projectId,r.id,Number(r.revision),r):await f.service.createLead(f.access,f.projectId,r);
+else throw Error('Unknown local fixture operation');return Response.json({ok:true,data:data??true,snapshot:await snapshot(f)});
+}catch(e){const error=e instanceof Error?e.message:'Failed';return Response.json({ok:false,error:/query:|params:/i.test(error)?'Fixture database validation failed':error});}}
+`);
+await writeFile(join(root,'app/portal/sales/page.tsx'),`"use client";import {useState,useEffect,Suspense} from 'react';import {useSearchParams} from 'next/navigation';import {SalesWorkspace} from ${JSON.stringify(repo+'/components/sales/workspace')};import {Workspace} from ${JSON.stringify(repo+'/components/portal/workspace')};
+function Harness(){const [snapshot,setSnapshot]=useState<any>(null);const params=useSearchParams();useEffect(()=>{fetch('/api/test').then(r=>r.json()).then(setSnapshot);const listener=(e:any)=>setSnapshot(e.detail);window.addEventListener('local-lifecycle-refresh',listener);return()=>window.removeEventListener('local-lifecycle-refresh',listener);},[]);if(!snapshot)return <p>Loading isolated PGlite fixture…</p>;return <Workspace projects={[{id:snapshot.projectId,name:'Golfview local fixture'}]} admin={false} sales><p style={{position:'fixed',right:8,top:8,zIndex:2147483647,fontSize:10,padding:6,background:'#fff2cc'}}>SYNTHETIC LOCAL DATA · NO PRODUCTION SESSION</p><SalesWorkspace projectId={snapshot.projectId} projectName="Golfview" projects={[{id:snapshot.projectId,name:'Golfview'}]} data={snapshot.data} reviewPlan={snapshot.plan} lifecycle={params.get('inactive')?{enabled:false,data:null,reason:'Owner approval required. No transaction entry is activated.'}:snapshot.lifecycle}/></Workspace>;}
+export default function Page(){return <Suspense><Harness/></Suspense>}`);
+console.log('Loopback PGlite lifecycle integration harness:',root);const child=spawn(process.execPath,[join(repo,'node_modules/next/dist/bin/next'),'dev',root,'--hostname','127.0.0.1','--port',process.argv[2]??'3041'],{cwd:root,stdio:'inherit'});for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>child.kill(signal));child.on('exit',c=>process.exit(c??1));

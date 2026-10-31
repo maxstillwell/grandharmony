@@ -19,5 +19,15 @@ export type Shared = {
   selectedUnitId?: string | null;
   onSelectUnit?: (id: string | null) => void;
   feedback?: { message: string; failed: boolean };
+  clearFeedback?: () => void;
+  lifecycle?: import("@/lib/sales/lifecycle-access").LifecycleState;
+  onOpenLifecycle?: (
+    area: string,
+    unitId?: string | null,
+    leadId?: string | null,
+  ) => void;
+  onOpenUnit?: (id: string) => void;
+  openUnitId?: string | null;
+  onClearOpenUnit?: () => void;
   onOpenLead?: (id: string) => void;
 };
