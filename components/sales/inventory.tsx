@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { Shared, Unit } from "./types";
-import { unitStatuses } from "@/lib/sales/domain";
+import { nextUnitStatuses, unitStatuses } from "@/lib/sales/domain";
 import {
   Area,
   Check,
@@ -256,6 +256,8 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
                 label={title}
                 value={unit?.[key as keyof Unit] as string | number | null}
                 required={key === "number"}
+              type={["number", "lot", "housingType"].includes(key) ? "text" : "number"}
+              step={["bedrooms", "bathrooms", "carSpaces", "floorLevels"].includes(key) ? "1" : "0.01"}
               />
             ))}
             <Select
@@ -329,7 +331,7 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
           ))}
         </dl>
       )}
-      {unit && data.permissions["status.edit"] && (
+      {unit && data.permissions["status.edit"] && nextUnitStatuses(unit.status).length > 0 && (
         <form
           className="mt-8 space-y-4 border-t pt-6"
           onSubmit={(e) => {
@@ -341,8 +343,8 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
           <Select
             name="status"
             label="Requested status"
-            value={unit.status}
-            options={options(unitStatuses)}
+            value={nextUnitStatuses(unit.status)[0]}
+            options={options(nextUnitStatuses(unit.status))}
           />
           <Field name="reason" label="Reason for transition" required />
           <button className="portal-button" disabled={pending}>
@@ -362,6 +364,7 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
           <Field
             name="publicAskingPrice"
             label="Approved public asking price (decimal, no commas)"
+            type="number"
             value={unit.publicAskingPrice}
           />
           <Check
@@ -377,6 +380,7 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
       {unit && data.permissions["prices.view"] && (
         <section className="mt-8 border-t pt-6">
           <h3>Confidential prices · AUD</h3>
+          <p className="portal-helper">Due dates use Sydney time (AEST / AEDT).</p>
           {data.permissions["prices.edit"] ? (
             <form
               className="mt-4 space-y-4"
@@ -396,7 +400,8 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
                   <Field
                     key={key}
                     name={key}
-                    label={key}
+                    label={({ askingPrice: "Asking price", minimumPrice: "Minimum price", contractPrice: "Contract price", depositAmount: "Deposit amount", settlementAmount: "Settlement amount" } as Record<string, string>)[key]}
+                    type="number"
                     value={
                       prices?.[key as keyof typeof prices] as string | null
                     }
@@ -407,12 +412,14 @@ function UnitEditor({ data, run, pending, unit, onSaved }: Shared & { unit?: Uni
                   label="Deposit due"
                   type="datetime-local"
                   value={date(prices?.depositDueAt ?? null)}
+                  instant={prices?.depositDueAt}
                 />
                 <Field
                   name="settlementDueAt"
                   label="Settlement due"
                   type="datetime-local"
                   value={date(prices?.settlementDueAt ?? null)}
+                  instant={prices?.settlementDueAt}
                 />
                 <Select
                   name="gstTreatment"

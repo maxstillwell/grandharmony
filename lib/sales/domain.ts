@@ -1,3 +1,5 @@
+import { parseSalesDate } from "./dates";
+
 export const unitStatuses = [
   "not_released",
   "available",
@@ -32,6 +34,9 @@ const transitions: Record<UnitStatus, readonly UnitStatus[]> = {
   settled: [],
   withdrawn: ["not_released"],
 };
+export function nextUnitStatuses(status: UnitStatus): readonly UnitStatus[] {
+  return transitions[status] ?? [];
+}
 export function assertTransition(
   from: UnitStatus,
   to: string,
@@ -196,14 +201,7 @@ export function validatePrices(input: unknown) {
   };
 }
 export function dateOrNull(value: unknown) {
-  if (!value) return null;
-  if (
-    typeof value !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(value) ||
-    !Number.isFinite(Date.parse(value))
-  )
-    throw new Error("Invalid date.");
-  return new Date(value);
+  return parseSalesDate(value);
 }
 export function validateEnquiry(input: unknown) {
   const row = record(input);

@@ -214,6 +214,7 @@ export function createSalesService(db: SalesDb) {
         throw new Error("Invalid stage order.");
       return db.transaction(async (tx) => {
         await config(tx, projectId);
+        let stageId: string;
         if (row.id) {
           if (!validId(row.id)) throw new Error("Invalid stage.");
           const [saved] = await tx
@@ -222,8 +223,13 @@ export function createSalesService(db: SalesDb) {
             .where(and(eq(table.projectId, projectId), eq(table.id, row.id)))
             .returning();
           if (!saved) throw new Error("Stage was not found in this project.");
-        } else await tx.insert(table).values({ projectId, ...values });
-        await event(tx, projectId, access.userId, `stage.${row.kind}.saved`);
+          stageId = saved.id;
+        } else {
+          const [saved] = await tx.insert(table).values({ projectId, ...values }).returning({ id: table.id });
+          stageId = saved.id;
+        }
+        await event(tx, projectId, access.userId, `stage.${row.kind}.saved`, {}, { stageId });
+        return stageId;
       });
     },
     async saveUnit(

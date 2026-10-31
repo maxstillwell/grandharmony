@@ -16,9 +16,9 @@ export function Publishing({ data, run, pending }: Shared) {
         <button
           className="portal-button my-5"
           disabled={pending || !data.settings}
-          onClick={() => run("draft", {})}
+          onClick={async () => { const id = await run("draft", {}); if (typeof id === "string") setSelected(id); }}
         >
-          Create snapshot from current inventory
+          Create draft and preview
         </button>
       )}
       <ul className="divide-y">
@@ -35,6 +35,7 @@ export function Publishing({ data, run, pending }: Shared) {
               <button
                 className="portal-button"
                 onClick={() => setSelected(p.id)}
+                aria-pressed={selected === p.id}
               >
                 Preview
               </button>
@@ -42,7 +43,7 @@ export function Publishing({ data, run, pending }: Shared) {
                 <button
                   className="portal-button"
                   disabled={pending}
-                  onClick={() => run("draft", { restoreId: p.id })}
+                  onClick={async () => { const id = await run("draft", { restoreId: p.id }); if (typeof id === "string") setSelected(id); }}
                 >
                   Restore to new draft
                 </button>

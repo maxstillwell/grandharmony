@@ -20,6 +20,7 @@ const { drizzle } = require("drizzle-orm/pglite");
 const { eq } = require("drizzle-orm");
 const s = require("../lib/db/schema.ts");
 const domain = require("../lib/sales/domain.ts");
+const { salesDateInput } = require("../lib/sales/dates.ts");
 const { createSalesService } = require("../lib/sales/service.ts");
 const { canSales } = require("../lib/sales/permissions.ts");
 const { effectiveRole } = require("../lib/auth/roles.ts");
@@ -613,4 +614,38 @@ test('concurrent writers cannot silently overwrite a unit revision', async () =>
   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
   assert.equal((await current(id)).revision,2);
   assert.ok((await current(id)).validationWarnings.length>0);
+});
+
+test('Sydney follow-ups and payment dates do not depend on server time zone', () => {
+  assert.equal(domain.dateOrNull('2026-01-15T09:30').toISOString(), '2026-01-14T22:30:00.000Z');
+  assert.equal(domain.dateOrNull('2026-07-15T09:30').toISOString(), '2026-07-14T23:30:00.000Z');
+  assert.equal(salesDateInput('2026-01-14T22:30:17.123Z'), '2026-01-15T09:30');
+  assert.equal(domain.dateOrNull('2026-04-05T02:30:00+10:00').toISOString(), '2026-04-04T16:30:00.000Z');
+  assert.throws(() => domain.dateOrNull('2026-10-04T02:30'), /daylight saving/);
+  assert.throws(() => domain.dateOrNull('2026-04-05T02:30'), /daylight saving/);
+  assert.throws(() => domain.dateOrNull('2026-02-30T09:30'), /Invalid date/);
+  assert.throws(() => domain.dateOrNull('2026-02-30T09:30:00Z'), /Invalid date/);
+  assert.equal(domain.dateOrNull(''), null);
+});
+test('saving a newly created stage again edits the same register entry', async () => {
+  const f=await fixture();
+  const id=await service.saveStage(f.admin,f.projectId,{kind:'construction',code:'C1',name:'Isolated stage',sequence:'1'});
+  assert.ok(domain.validId(id));
+  assert.equal(await service.saveStage(f.admin,f.projectId,{id,kind:'construction',code:'C1',name:'Isolated revised stage',sequence:'2'}),id);
+  const w=await service.workspace(f.admin,f.projectId);
+  assert.equal(w.construction.length,1);
+  assert.equal(w.construction[0].name,'Isolated revised stage');
+  assert.equal(w.construction[0].sequence,2);
+});
+test('Sydney CRM follow-up persists the intended instant and can be cleared', async () => {
+  const f=await fixture();const id=await service.createLead(f.admin,f.projectId,enquiry());
+  await service.updateLead(f.admin,f.projectId,id,1,{status:'contacted',followUpAt:'2026-11-03T09:15'});
+  assert.equal((await service.workspace(f.admin,f.projectId)).leads[0].followUpAt.toISOString(),'2026-11-02T22:15:00.000Z');
+  await service.updateLead(f.admin,f.projectId,id,2,{status:'qualified',followUpAt:''});
+  assert.equal((await service.workspace(f.admin,f.projectId)).leads[0].followUpAt,null);
+});
+test('status choices offer only server-valid transitions and none after settlement', () => {
+  assert.deepEqual(domain.nextUnitStatuses('settled'),[]);
+  assert.deepEqual(domain.nextUnitStatuses('available'),['on_hold','reserved','withdrawn']);
+  assert.ok(!domain.nextUnitStatuses('not_released').includes('settled'));
 });

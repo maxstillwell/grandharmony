@@ -1,5 +1,6 @@
 "use client";
 import { useId } from "react";
+import { salesDateInput } from "@/lib/sales/dates";
 export function Field({
   name,
   label,
@@ -7,6 +8,8 @@ export function Field({
   type = "text",
   required = false,
   children,
+  step,
+  instant,
 }: {
   name: string;
   label: string;
@@ -14,6 +17,8 @@ export function Field({
   type?: string;
   required?: boolean;
   children?: React.ReactNode;
+  step?: string;
+  instant?: Date | string | null;
 }) {
   const id = useId();
   return (
@@ -27,8 +32,10 @@ export function Field({
           type={type}
           defaultValue={value ?? ""}
           required={required}
-          step={type === "number" ? "0.01" : undefined}
+          step={step ?? (type === "number" ? "0.01" : undefined)}
           min={type === "number" ? "0" : undefined}
+          data-original-instant={instant ? new Date(instant).toISOString() : undefined}
+          data-original-local={instant ? salesDateInput(instant) : undefined}
         />
       )}
     </label>
@@ -47,8 +54,8 @@ export function Select({
 }) {
   const id = useId();
   return (
-    <label className="block text-xs text-[#566045]" htmlFor={id}>
-      <span className="mb-2 block">{label}</span>
+    <div className="block text-xs text-[#566045]">
+      <label className="mb-2 block" htmlFor={id}>{label}</label>
       <select
         id={id}
         className="w-full rounded border border-[#d7d4cc] bg-white p-3 text-sm"
@@ -61,7 +68,7 @@ export function Select({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }
 export function Area({
@@ -133,15 +140,20 @@ export function formRecord(form: HTMLFormElement) {
     "unitIds",
   ])
     if (data.has(key))
-      row[key] = String(data.get(key))
-        .split(/\r?\n/)
+      row[key] = data.getAll(key).flatMap(value => String(value).split(/\r?\n/))
         .map((x) => x.trim())
         .filter(Boolean);
+  // Preserve the exact instant, including seconds and either side of a repeated
+  // DST hour, when an existing Sydney datetime input has not been edited.
+  for (const key of ["followUpAt", "depositDueAt", "settlementDueAt"]) {
+    const input = form.elements.namedItem(key);
+    if (input instanceof HTMLInputElement && input.dataset.originalInstant && input.value === input.dataset.originalLocal)
+      row[key] = input.dataset.originalInstant;
+  }
   return row;
 }
 export const label = (value: string) => value.replaceAll("_", " ");
-export const date = (value: Date | string | null) =>
-  value ? new Date(value).toISOString().slice(0, 16) : "";
+export const date = salesDateInput;
 
 export const options = (values: readonly string[]) =>
   values.map((value) => ({ value, label: label(value) }));

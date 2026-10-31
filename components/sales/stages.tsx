@@ -56,13 +56,16 @@ export function Stages({ data, run, pending }: Shared) {
         <form
           key={`${editing.kind}-${editing.id ?? "new"}`}
           className="space-y-4"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            void run("stage", {
-              ...formRecord(e.currentTarget),
+            const input = formRecord(e.currentTarget);
+            const saved = await run("stage", {
+              ...input,
               kind: editing.kind,
               ...(editing.id ? { id: editing.id } : {}),
             });
+            if (typeof saved === "string") setEditing({ kind: editing.kind, id: saved,
+              code: String(input.code), name: String(input.name), sequence: Number(input.sequence) });
           }}
         >
           <h2>
@@ -74,6 +77,8 @@ export function Stages({ data, run, pending }: Shared) {
             name="sequence"
             label="Sort order"
             value={editing.sequence ?? 0}
+            type="number"
+            step="1"
           />
           <button className="portal-button" disabled={pending}>
             Save stage

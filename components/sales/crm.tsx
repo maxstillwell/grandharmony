@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
-import type { Shared } from "./types";
+import { useEffect, useState } from "react";
+import type { Data, Shared } from "./types";
 import { leadStatuses } from "@/lib/sales/domain";
+import { displaySalesDate } from "@/lib/sales/dates";
+import { UnitChoices } from "./unit-choices";
 import {
   Area,
   Check,
@@ -16,7 +18,7 @@ export function Crm({ data, run, pending, projectId }: Shared) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-  const [activity, setActivity] = useState("");
+  const [activity, setActivity] = useState<Data["history"] | null>(null);
   const leads = data.leads.filter(
     (l) =>
       `${l.name} ${l.email} ${l.phone ?? ""}`
@@ -25,6 +27,16 @@ export function Crm({ data, run, pending, projectId }: Shared) {
       (!status || l.status === status),
   );
   const lead = data.leads.find((l) => l.id === selected);
+  const leadId = lead?.id, leadRevision = lead?.revision;
+  useEffect(() => {
+    if (!leadId) { setActivity(null); return; }
+    let current = true;
+    setActivity(null);
+    void run("activity", { id: leadId }).then(result => {
+      if (current) setActivity(Array.isArray(result) ? result : []);
+    });
+    return () => { current = false; };
+  }, [leadId, leadRevision, run]);
   return (
     <>
       <section className="portal-card">
@@ -93,17 +105,11 @@ export function Crm({ data, run, pending, projectId }: Shared) {
                     {l.phone}
                   </td>
                   <td>{label(l.status)}</td>
-                  <td>{date(l.followUpAt) || "Not scheduled"}</td>
+                  <td>{displaySalesDate(l.followUpAt)} <span className="text-xs">{l.followUpAt ? "Sydney" : ""}</span></td>
                   <td>
                     <button
                       className="portal-button"
-                      onClick={async () => {
-                        setSelected(l.id);
-                        setActivity("");
-                        const result = await run("activity", { id: l.id });
-                        if (result)
-                          setActivity(JSON.stringify(result, null, 2));
-                      }}
+                      onClick={() => setSelected(l.id)}
                     >
                       Open lead
                     </button>
@@ -131,7 +137,7 @@ export function Crm({ data, run, pending, projectId }: Shared) {
               <p className="my-3 whitespace-pre-wrap text-sm">{lead.message}</p>
               <p className="text-xs">
                 Source: {lead.source} · Privacy {lead.privacyVersion} accepted{" "}
-                {date(lead.consentAt)} · Marketing:{" "}
+                {displaySalesDate(lead.consentAt)} Sydney · Marketing:{" "}
                 {lead.marketingConsent ? "Yes" : "No"} · Preferred contact:{" "}
                 {lead.contactPreference}
               </p>
@@ -156,8 +162,9 @@ export function Crm({ data, run, pending, projectId }: Shared) {
                   />
                   <Field
                     name="followUpAt"
-                    label="Next follow-up"
+                    label="Next follow-up · Sydney time (AEST / AEDT)"
                     value={date(lead.followUpAt)}
+                    instant={lead.followUpAt}
                     type="datetime-local"
                   />
                   {data.permissions["leads.assign"] && (
@@ -190,11 +197,7 @@ export function Crm({ data, run, pending, projectId }: Shared) {
                             })),
                         ]}
                       />
-                      <Area
-                        name="unitIds"
-                        label="Interested unit IDs, one per line"
-                        value={lead.unitIds.join("\n")}
-                      />
+                      <UnitChoices units={data.units} selected={lead.unitIds} />
                     </>
                   )}
                   <Area name="note" label="Interaction / follow-up note" />
@@ -204,22 +207,18 @@ export function Crm({ data, run, pending, projectId }: Shared) {
                 </form>
               )}
               <h3>Activity history</h3>
-              <button
-                className="portal-button my-3"
-                disabled={pending}
-                onClick={async () =>
-                  setActivity(
-                    JSON.stringify(
-                      await run("activity", { id: lead.id }),
-                      null,
-                      2,
-                    ),
-                  )
-                }
-              >
-                Refresh activity
-              </button>
-              <pre className="max-h-96 overflow-auto text-xs">{activity}</pre>
+              {activity === null ? <p role="status">Loading activity…</p> : activity.length ? (
+                <ol className="mt-4 max-h-96 divide-y overflow-auto">
+                  {activity.map(event => <li className="space-y-2 py-4 text-sm" key={event.id}>
+                    <strong>{label(event.action.replaceAll(".", " "))}</strong>
+                    <p className="text-xs">{displaySalesDate(event.createdAt)} Sydney</p>
+                    {typeof event.details.from === "string" && typeof event.details.to === "string" &&
+                      <p>{label(event.details.from)} → {label(event.details.to)}</p>}
+                    {typeof event.details.note === "string" && <p className="whitespace-pre-wrap">{event.details.note}</p>}
+                    {typeof event.details.followUpAt === "string" && <p>Follow-up: {displaySalesDate(event.details.followUpAt)} Sydney</p>}
+                  </li>)}
+                </ol>
+              ) : <p className="portal-empty">No activity available for this lead.</p>}
             </>
           ) : selected === "new" ? (
             <form
@@ -227,7 +226,7 @@ export function Crm({ data, run, pending, projectId }: Shared) {
               onSubmit={async (e) => {
                 e.preventDefault();
                 const saved = await run("lead", formRecord(e.currentTarget));
-                if (typeof saved === "string") { setSelected(saved); setActivity(""); }
+                if (typeof saved === "string") { setSelected(saved); setActivity(null); }
               }}
             >
               <h2>Create consented enquiry</h2>
@@ -235,10 +234,7 @@ export function Crm({ data, run, pending, projectId }: Shared) {
               <Field name="email" label="Email" type="email" required />
               <Field name="phone" label="Phone (optional)" />
               <Area name="message" label="Enquiry" required />
-              <Area
-                name="unitIds"
-                label="Interested unit IDs, one per line (optional)"
-              />
+              <UnitChoices units={data.units} />
               <Field
                 name="privacyVersion"
                 label="Privacy notice version acknowledged by customer"

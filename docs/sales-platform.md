@@ -31,3 +31,9 @@ Earlier feature/Preview work was stopped at the owner's workflow change. Its tes
 Owner-authorised synthetic inventory, exact-decimal private prices, CRM lead assignment/follow-up and activity CRUD passed against the existing production database. Assertions also verified stale revision rejection and the negative-price constraint. All synthetic writes were inside a deliberately rolled-back PL/pgSQL subtransaction, followed by outer transaction ROLLBACK. An independent subsequent connection confirmed inventory/leads/private prices/events/publications all remained at zero and enquiries stayed disabled. No users, existing business data or publication pointers were changed.
 
 This verifies live SQL constraints and transaction behavior, not authenticated Portal/browser operations or the application's service-layer permission checks. Those remain covered by automated service tests and require a legitimate existing login for live UI acceptance. No session was forged or password reset.
+
+## Sales workflow improvements
+
+New stages return their saved ID and remain in edit mode; status choices use the server transition graph. CRM uses a readable activity timeline with cancellation of stale lead responses and a residence picker instead of manual UUID entry. Draft creation opens the exact preview without approving or publishing. Saves remain disabled while refreshed revisions arrive.
+
+CRM follow-ups and confidential payment due dates are explicitly Sydney wall times, converted server-side independently of deployment timezone. Explicit ISO offsets remain accepted; skipped/repeated DST inputs are rejected. Unedited existing fields retain their full original instant (including seconds and either side of a repeated hour). Production authenticated acceptance still needs an existing authorised session; local component/browser regressions do not substitute for that login.

@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { salesAction } from "@/lib/sales/actions";
 import type { Data, Shared } from "./types";
@@ -23,32 +24,35 @@ export function SalesWorkspace({
   const [tab, setTab] = useState("Overview");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+  const saving = useRef(false);
   const router = useRouter();
-  async function run(operation: string, input: Record<string, unknown>) {
-    setPending(true);
-    setMessage("");
+  const run = useCallback(async (operation: string, input: Record<string, unknown>) => {
+    const reading = operation === "activity";
+    if (!reading && saving.current) return undefined;
+    if (!reading) { saving.current = true; setPending(true); setMessage(""); setFailed(false); }
     try {
       const result = await salesAction(projectId, operation, input);
       if (!result.ok) throw new Error(result.error);
-      setMessage(
+      if (!reading) setMessage(
         operation === "import" && !input.commit
           ? "Import validated. Nothing has been saved."
-          : operation === "activity"
-            ? "Activity loaded."
-            : "Saved successfully.",
+          : "Saved successfully.",
       );
-      router.refresh();
+      if (!reading) startRefresh(() => router.refresh());
       return result.data;
     } catch (error) {
+      setFailed(true);
       setMessage(
         error instanceof Error ? error.message : "The operation failed.",
       );
       return undefined;
     } finally {
-      setPending(false);
+      if (!reading) { saving.current = false; setPending(false); }
     }
-  }
-  const shared = { data, run, pending, projectId };
+  }, [projectId, router]);
+  const shared = { data, run, pending: pending || refreshing, projectId };
   const tabs = [
     "Overview",
     "Inventory",
@@ -64,11 +68,13 @@ export function SalesWorkspace({
     <main className="portal-page">
       <div className="portal-page-inner">
         <header className="portal-page-title">
+          <Link className="portal-button mb-4" href={`/portal/projects/${projectId}`}>← Project workspace</Link>
           <p className="portal-kicker">Grand Harmony / {projectName}</p>
           <h1>Sales Management</h1>
           <p className="portal-helper">
             Inventory, customer relationships and controlled publication.
           </p>
+          <p className="portal-helper">Dates use Sydney time (AEST / AEDT). Saving inventory or prices does not publish them.</p>
         </header>
         <nav aria-label="Sales workspace" className="mb-6 flex flex-wrap gap-2">
           {tabs.map((item) => (
@@ -76,14 +82,15 @@ export function SalesWorkspace({
               className="portal-button"
               aria-pressed={tab === item}
               key={item}
-              onClick={() => setTab(item)}
+              onClick={() => { setTab(item); setMessage(""); }}
+              disabled={pending || refreshing}
             >
               {item}
             </button>
           ))}
         </nav>
         {message && (
-          <p role="status" className="portal-card mb-5">
+          <p role={failed ? "alert" : "status"} className="portal-card mb-5">
             {message}
           </p>
         )}
