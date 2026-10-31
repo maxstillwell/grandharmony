@@ -649,3 +649,48 @@ test('status choices offer only server-valid transitions and none after settleme
   assert.deepEqual(domain.nextUnitStatuses('available'),['on_hold','reserved','withdrawn']);
   assert.ok(!domain.nextUnitStatuses('not_released').includes('settled'));
 });
+
+test('sales selection defaults to Golfview while explicit inaccessible projects fail closed', () => {
+  const {chooseSalesProject,salesProjectName} = require('../lib/sales/projects.ts');
+  const future={id:'future',name:'Future development',slug:'future-development'};
+  const legacy={id:'legacy',name:'700 Project',slug:'700-project'};
+  assert.equal(chooseSalesProject([future,legacy]).id,'legacy');
+  assert.equal(salesProjectName(legacy),'Golfview');
+  assert.equal(legacy.name,'700 Project'); // no master-record rename or UUID change
+  assert.equal(chooseSalesProject([future,legacy],'future').id,'future');
+  assert.equal(chooseSalesProject([future],'legacy'),undefined);
+  assert.equal(chooseSalesProject([]),undefined);
+  assert.equal(salesProjectName(future),'Future development');
+});
+
+test('working inventory refresh changes map source but cannot silently mutate the live snapshot', async () => {
+  const f=await fixture();const id=await unit(f,'MAPPED-01');
+  await service.changeStatus(f.admin,f.projectId,id,1,'available','Isolated initial release');
+  const draft=await service.createDraft(f.admin,f.projectId);
+  let w=await service.workspace(f.admin,f.projectId);
+  await service.approve(f.admin,f.projectId,draft,w.publications[0].digest);
+  await service.publish(f.admin,f.projectId,draft);
+  const before=await service.publicInventory(f.projectId);
+  await service.changeStatus(f.admin,f.projectId,id,2,'reserved','Isolated reservation');
+  let row=await current(id);
+  await service.saveUnit(f.admin,f.projectId,{...row,publicVisible:false},id,row.revision);
+  w=await service.workspace(f.admin,f.projectId);
+  assert.equal(w.units.find(u=>u.id===id).status,'reserved');
+  assert.equal(w.units.find(u=>u.id===id).publicVisible,false);
+  assert.deepEqual((await service.publicInventory(f.projectId)).units,before.units);
+  assert.ok(w.publicData.units.some(u=>u.id===id));
+  const agent=await service.workspace(f.agent,f.projectId);
+  assert.deepEqual(agent.units,[]);assert.deepEqual(agent.prices,[]);
+});
+
+test('draft map requires Golfview membership, intersected sales permissions and internal access', () => {
+  const {canReviewSalesMap}=require('../lib/sales/projects.ts');
+  const project={id:'golfview-id',name:'700 Project',slug:'700-project',membershipRole:'management',canManage:true};
+  const a={userId:'local',role:'management',roles:['management'],projects:[project]};
+  assert.equal(canReviewSalesMap(a,project.id),true);
+  assert.equal(canReviewSalesMap(a,'another-project'),false);
+  assert.equal(canReviewSalesMap({...a,projects:[{...project,slug:'future',name:'Future'}]},project.id),false);
+  assert.equal(canReviewSalesMap({...a,role:'external_agent',roles:['external_agent']},project.id),false);
+  assert.equal(canReviewSalesMap({...a,projects:[{...project,membershipRole:'external_agent'}]},project.id),false);
+  assert.equal(canReviewSalesMap({...a,projects:[{...project,membershipRole:'unknown'}]},project.id),false);
+});

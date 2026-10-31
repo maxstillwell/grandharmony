@@ -1,0 +1,18 @@
+{
+  "repository": "maxstillwell/golfview",
+  "commit": "539e93c45f0dd81f1dc7c02d1c7d83abdbc262c5",
+  "originalDirectory": "assets/site-explorer/draft",
+  "approval": "UNAPPROVED \u2014 internal architectural review only",
+  "files": [
+    {
+      "path": "plan.json",
+      "bytes": 34370,
+      "sha256": "353162b6e9ac68c5d8f853fa0cb66d075eb4d77ff3c7fad9742f83f869be3f76"
+    },
+    {
+      "path": "masterplan.svg",
+      "bytes": 386806,
+      "sha256": "236ef3715bb0dced7f5af995caffa7f89b2ab60833df5176d09cfabb1c24e3f3"
+    }
+  ]
+}

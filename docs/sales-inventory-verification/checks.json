@@ -1,0 +1,22 @@
+{
+  "lint": "PASS",
+  "typecheck": "PASS",
+  "automatedTests": {
+    "passed": 43,
+    "failed": 0,
+    "database": "PGlite only"
+  },
+  "productionBuild": "PASS",
+  "browserFlows": {
+    "passed": 9,
+    "scope": "Loopback synthetic component harness, no live session"
+  },
+  "localProductionHttpChecks": 8,
+  "publicGeometryChunkScan": "PASS",
+  "protectedAssetTrace": "PASS",
+  "neonWrites": 0,
+  "liveImports": 0,
+  "livePublications": 0,
+  "golfviewUnchangedCommit": "539e93c45f0dd81f1dc7c02d1c7d83abdbc262c5",
+  "authenticatedProductionAcceptance": "PENDING \u2014 existing authenticated browser/session unavailable; no sharing or bypass allowed"
+}

@@ -1,0 +1,16 @@
+{
+  "passed": 9,
+  "tests": [
+    "Top-level Sales Management navigation, Golfview selector and 47-record inventory render",
+    "Search includes tags and numbers; empty results and reset work",
+    "Unchanged source geometry loads; table-to-map and map-to-table keyboard selection share record IDs",
+    "Confirmed status update changes table and map colour; draft inclusion does not imply live publication",
+    "Selection survives Inventory/Explorer navigation; full editor saves the same canonical record",
+    "CSV duplicate/invalid/forbidden headers detected; preview, server dry-run gate, edit invalidation and file-size safeguards work",
+    "Project navigation resets workspace and never reuses Golfview inventory/geometry for another project",
+    "390px touch layout contains wide table/map scrolling without page overflow",
+    "No uncaught browser exceptions"
+  ],
+  "pageErrors": [],
+  "scope": "Synthetic loopback harness; not authenticated Production acceptance"
+}

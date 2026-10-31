@@ -104,8 +104,10 @@ export async function salesAction(
       default:
         throw new Error("Unknown operation.");
     }
-    if (operation !== "activity")
+    if (operation !== "activity") {
       revalidatePath(`/portal/projects/${projectId}/sales`);
+      revalidatePath("/portal/sales");
+    }
     return { ok: true, data };
   } catch (error) {
     // Driver errors contain SQL and parameter values. Never send those to clients.

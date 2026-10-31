@@ -1,6 +1,8 @@
 "use client";
 import type { Shared } from "./types";
 import { date, label } from "./forms";
+import { statusPresentation } from "./inventory-status";
+import { displaySalesDate } from "@/lib/sales/dates";
 export function Overview({ data }: Shared) {
   if (data.agent)
     return (
@@ -36,6 +38,23 @@ export function Overview({ data }: Shared) {
   ];
   return (
     <>
+      <section className="portal-card">
+        <h2>Inventory by status</h2>
+        <div className="mt-4 flex flex-wrap gap-5">
+          {Object.entries(statusPresentation).map(([key, item]) => (
+            <div key={key} className="text-xs">
+              <span
+                className="mr-2 inline-block h-2 w-2 rounded-full"
+                style={{ background: item.colour }}
+              />
+              {item.label}
+              <strong className="mt-2 block text-xl font-medium">
+                {count(key)}
+              </strong>
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {metrics.map(([name, value]) => (
           <section className="portal-card" key={String(name)}>
@@ -64,6 +83,25 @@ export function Overview({ data }: Shared) {
           aria-label="Unconditional and settled sales progress"
         />
       </section>
+      {data.permissions["audit.view"] && (
+        <section className="portal-card">
+          <h2>Recent activity</h2>
+          {data.history.length ? (
+            <ol className="mt-4 divide-y">
+              {data.history.slice(0, 5).map((event) => (
+                <li key={event.id} className="py-3 text-sm">
+                  <strong>{label(event.action)}</strong>
+                  <span className="ml-3 text-xs text-[#737b65]">
+                    {displaySalesDate(event.createdAt)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="portal-helper">No recorded sales changes.</p>
+          )}
+        </section>
+      )}
       <div className="grid gap-5 md:grid-cols-2">
         {(
           [

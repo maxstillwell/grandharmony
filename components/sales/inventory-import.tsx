@@ -1,17 +1,47 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Shared } from "./types";
-export function Import({ projectId, run, pending }: Shared) {
+import { importColumns, parseImport } from "@/lib/sales/domain";
+import styles from "./inventory.module.css";
+export function Import({ projectId, data, run, pending }: Shared) {
   const [csv, setCsv] = useState("");
-  const [preview, setPreview] = useState("");
   const [validated, setValidated] = useState("");
+  const [message, setMessage] = useState("");
+  const [fileError, setFileError] = useState("");
+  const generation = useRef(0);
+  const preview = useMemo(() => {
+    if (!csv) return { rows: [], error: "" };
+    try {
+      const rows = parseImport(csv);
+      const existing = new Set(data.units.map((u) => u.number));
+      const duplicates = rows.filter((u) => existing.has(u.number));
+      if (duplicates.length)
+        throw new Error(
+          `Already recorded: ${duplicates.map((u) => u.number).join(", ")}. Import is add-only; edit existing records instead.`,
+        );
+      return { rows, error: "" };
+    } catch (error) {
+      return {
+        rows: [],
+        error: error instanceof Error ? error.message : "Invalid CSV.",
+      };
+    }
+  }, [csv, data.units]);
+  function change(value: string) {
+    generation.current++;
+    setCsv(value);
+    setValidated("");
+    setMessage("");
+    setFileError("");
+  }
   return (
     <section className="portal-card">
-      <h2>Approved inventory import</h2>
+      <p className="portal-kicker">Inventory onboarding</p>
+      <h2>Import approved inventory</h2>
       <p className="portal-helper">
-        Add-only CSV import; existing records are never overwritten. A
-        source-document reference is required for every row. Private prices,
-        sales statuses and publication flags cannot be imported.
+        Add-only import. Existing records are never overwritten. All new records
+        start unreleased and unpublished; prices, status and publication flags
+        are deliberately excluded.
       </p>
       <a
         className="portal-button my-5"
@@ -19,18 +49,58 @@ export function Import({ projectId, run, pending }: Shared) {
       >
         Download blank CSV template
       </a>
+      <details className="mb-5 text-sm">
+        <summary>Field mapping and accepted headers</summary>
+        <p className="portal-helper">
+          Use these exact column names in any order. Required: number and
+          sourceDocument. Optional stage fields must contain the current project
+          stage UUID, not a display name. Unknown columns are rejected.
+        </p>
+        <code className="mt-3 block break-words text-xs">
+          {importColumns.join(", ")}
+        </code>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {[
+            ["Construction", data.construction],
+            ["Release", data.release],
+          ].map(([name, stages]) => (
+            <div key={String(name)}>
+              <strong>{String(name)} stage IDs</strong>
+              <ul>
+                {(stages as typeof data.release).map((s) => (
+                  <li key={s.id} className="break-all text-xs">
+                    {s.name}: {s.id}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </details>
       <label className="mb-5 block text-sm">
         Choose approved CSV
         <input
-          className="block"
+          className="mt-2 block max-w-full"
           type="file"
           accept=".csv,text/csv"
+          disabled={pending}
           onChange={async (e) => {
             const file = e.target.files?.[0];
-            if (file && file.size <= 250000) {
-              setCsv(await file.text());
-              setValidated("");
-              setPreview("");
+            change("");
+            if (!file) return;
+            if (file.size > 250000) {
+              setFileError(
+                "CSV exceeds the 250 KB limit. No file has been loaded.",
+              );
+              return;
+            }
+            const version = generation.current;
+            try {
+              const source = await file.text();
+              if (generation.current === version) change(source);
+            } catch {
+              if (generation.current === version)
+                setFileError("The file could not be read.");
             }
           }}
         />
@@ -38,25 +108,65 @@ export function Import({ projectId, run, pending }: Shared) {
       <label className="block text-sm">
         CSV contents
         <textarea
-          rows={10}
-          className="mt-3 w-full border p-3 font-mono text-xs"
+          aria-label="CSV contents"
+          rows={8}
+          className="mt-3 w-full rounded border p-3 font-mono text-xs"
           value={csv}
-          onChange={(e) => {
-            setCsv(e.target.value);
-            setValidated("");
-            setPreview("");
-          }}
+          disabled={pending}
+          onChange={(e) => change(e.target.value)}
         />
       </label>
-      <div className="my-5 flex gap-4">
+      {(fileError || preview.error) && (
+        <p className={styles.warning} role="alert">
+          {fileError || preview.error}
+        </p>
+      )}
+      {preview.rows.length > 0 && (
+        <div className={styles.preview}>
+          <p className="portal-helper">
+            {preview.rows.length} structurally valid rows · server validation
+            still required. Showing first 50 rows.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Unit</th>
+                <th>Type</th>
+                <th>Land m²</th>
+                <th>Building m²</th>
+                <th>Source reference</th>
+                <th>Warnings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.rows.slice(0, 50).map((u) => (
+                <tr key={u.number}>
+                  <td>{u.number}</td>
+                  <td>{u.housingType ?? "—"}</td>
+                  <td>{u.landAreaSqm ?? "—"}</td>
+                  <td>{u.buildingAreaSqm ?? "—"}</td>
+                  <td>{u.sourceDocument}</td>
+                  <td>{u.validationWarnings.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="my-5 flex flex-wrap gap-4">
         <button
           className="portal-button"
-          disabled={pending || !csv}
+          disabled={
+            pending || !preview.rows.length || !!preview.error || !!fileError
+          }
           onClick={async () => {
+            const version = generation.current;
             const result = await run("import", { csv });
-            if (result) {
-              setPreview(JSON.stringify(result, null, 2));
+            if (result && version === generation.current) {
               setValidated(csv);
+              setMessage(
+                "Server dry-run passed: project stages, duplicates and capacity checked. Nothing saved.",
+              );
             }
           }}
         >
@@ -64,19 +174,31 @@ export function Import({ projectId, run, pending }: Shared) {
         </button>
         <button
           className="portal-button"
-          disabled={pending || !validated || validated !== csv}
+          disabled={
+            pending ||
+            !validated ||
+            validated !== csv ||
+            !!preview.error ||
+            !!fileError
+          }
           onClick={async () => {
             const result = await run("import", { csv, commit: true });
             if (result) {
               setValidated("");
-              setPreview("Import committed atomically.");
+              setMessage(
+                "Import committed atomically. Records remain unpublished.",
+              );
             }
           }}
         >
           Import validated rows
         </button>
       </div>
-      <pre className="max-h-96 overflow-auto text-xs">{preview}</pre>
+      {message && (
+        <p role="status" className="portal-helper">
+          {message}
+        </p>
+      )}
     </section>
   );
 }
