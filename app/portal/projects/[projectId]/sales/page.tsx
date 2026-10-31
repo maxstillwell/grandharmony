@@ -23,7 +23,7 @@ export default async function GolfviewSalesManagement({ params }: { params: Prom
       <h2>Inventory &amp; publishing</h2>
       <p className="portal-helper">The canonical 47-unit inventory is not yet imported. No sales prices, customer records or statuses are fabricated. Editable inventory and controlled publishing activate only after the reviewed Neon migration and project-specific permissions are in place.</p>
       <p className="portal-helper">The isolated 2D prototype currently uses clearly marked test geometry and is not a live sales channel.</p>
-      <div className="mt-5"><Link className="portal-button" href="/demo/700-explorer">Open 2D test explorer →</Link></div>
+      <div className="mt-5"><Link className="portal-button" href="/demo/golfview-explorer">Open 2D test explorer →</Link></div>
     </section>
   </div></main>;
 }
