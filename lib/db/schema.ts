@@ -1,4 +1,6 @@
-import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import type { PublicSnapshot } from "../sales/domain";
 
 export const appRole = pgEnum("app_role", ["super_admin", "management", "project_manager", "finance", "sales_manager", "external_agent"]);
 export const modelStatus = pgEnum("model_status", ["not_integrated", "active", "archived"]);
@@ -37,3 +39,58 @@ export const websitePublishEvents = pgTable("website_publish_events", { id: uuid
 export const accounts = pgTable("accounts", { userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), type: text("type").notNull(), provider: text("provider").notNull(), providerAccountId: text("provider_account_id").notNull(), refresh_token: text("refresh_token"), access_token: text("access_token"), expires_at: timestamp("expires_at", { withTimezone: true }), token_type: text("token_type"), scope: text("scope"), id_token: text("id_token"), session_state: text("session_state") }, (table) => [primaryKey({ columns: [table.provider, table.providerAccountId] })]);
 export const sessions = pgTable("sessions", { sessionToken: text("session_token").primaryKey(), userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), expires: timestamp("expires", { withTimezone: true }).notNull() });
 export const verificationTokens = pgTable("verification_tokens", { identifier: text("identifier").notNull(), token: text("token").notNull(), expires: timestamp("expires", { withTimezone: true }).notNull() }, (table) => [primaryKey({ columns: [table.identifier, table.token] })]);
+
+// Sales is additive: no existing Portal tables or records are repurposed.
+export const salesStatus = pgEnum("sales_unit_status", ["not_released", "available", "on_hold", "reserved", "contract_issued", "contract_signed", "unconditional", "settled", "withdrawn"]);
+export const leadStatus = pgEnum("sales_lead_status", ["new", "contact_attempted", "contacted", "qualified", "inspection_arranged", "negotiating", "converted", "lost", "archived"]);
+export const publicationStatus = pgEnum("sales_publication_status", ["draft", "approved", "published", "archived"]);
+
+export const salesConstructionStages = pgTable("sales_construction_stages", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), code: text("code").notNull(), name: text("name").notNull(), sequence: integer("sequence").default(0).notNull(), ...timestamps,
+}, t => [uniqueIndex("sales_construction_code_unique").on(t.projectId, t.code), uniqueIndex("sales_construction_project_id_unique").on(t.projectId, t.id)]);
+export const salesReleaseStages = pgTable("sales_release_stages", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), code: text("code").notNull(), name: text("name").notNull(), sequence: integer("sequence").default(0).notNull(), ...timestamps,
+}, t => [uniqueIndex("sales_release_code_unique").on(t.projectId, t.code), uniqueIndex("sales_release_project_id_unique").on(t.projectId, t.id)]);
+
+export const salesUnits = pgTable("sales_units", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }),
+  number: text("number").notNull(), lot: text("lot"), housingType: text("housing_type"), bedrooms: integer("bedrooms"), bathrooms: integer("bathrooms"), carSpaces: integer("car_spaces"), floorLevels: integer("floor_levels"),
+  landAreaSqm: numeric("land_area_sqm", { precision: 12, scale: 2 }), buildingAreaSqm: numeric("building_area_sqm", { precision: 12, scale: 2 }), internalAreaSqm: numeric("internal_area_sqm", { precision: 12, scale: 2 }), outdoorAreaSqm: numeric("outdoor_area_sqm", { precision: 12, scale: 2 }), totalAreaSqm: numeric("total_area_sqm", { precision: 12, scale: 2 }),
+  constructionStageId: uuid("construction_stage_id"), releaseStageId: uuid("release_stage_id"), status: salesStatus("status").default("not_released").notNull(), statusChangedAt: timestamp("status_changed_at", { withTimezone: true }).defaultNow().notNull(),
+  internalNotes: text("internal_notes"), features: jsonb("features").$type<string[]>().default([]).notNull(),
+  floorPlans: jsonb("floor_plans").$type<string[]>().default([]).notNull(), media: jsonb("media").$type<string[]>().default([]).notNull(), specifications: jsonb("specifications").$type<string[]>().default([]).notNull(),
+  sourceDocument: text("source_document").notNull(), validationWarnings: jsonb("validation_warnings").$type<string[]>().default([]).notNull(), provenance: jsonb("provenance").$type<Array<{ source: string; actor: string; recordedAt: string }>>().default([]).notNull(),
+  publicVisible: boolean("public_visible").default(false).notNull(), publicPriceVisible: boolean("public_price_visible").default(false).notNull(), publicAskingPrice: numeric("public_asking_price", { precision: 14, scale: 2 }),
+  revision: integer("revision").default(1).notNull(), updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }), ...timestamps,
+}, t => [uniqueIndex("sales_units_project_number_unique").on(t.projectId, t.number), uniqueIndex("sales_units_project_id_unique").on(t.projectId, t.id), index("sales_units_project_status_idx").on(t.projectId, t.status),
+  foreignKey({ columns: [t.projectId, t.constructionStageId], foreignColumns: [salesConstructionStages.projectId, salesConstructionStages.id] }),
+  foreignKey({ columns: [t.projectId, t.releaseStageId], foreignColumns: [salesReleaseStages.projectId, salesReleaseStages.id] }),
+  check("sales_units_valid_number", sql`length(trim(${t.number})) > 0 AND ${t.number} !~* '^TEST-'`),
+  check("sales_units_nonnegative", sql`coalesce(${t.bedrooms},0) >= 0 AND coalesce(${t.bathrooms},0) >= 0 AND coalesce(${t.carSpaces},0) >= 0 AND coalesce(${t.floorLevels},0) >= 0 AND coalesce(${t.landAreaSqm},0) >= 0 AND coalesce(${t.buildingAreaSqm},0) >= 0 AND coalesce(${t.internalAreaSqm},0) >= 0 AND coalesce(${t.outdoorAreaSqm},0) >= 0 AND coalesce(${t.totalAreaSqm},0) >= 0 AND coalesce(${t.publicAskingPrice},0) >= 0`),
+]);
+export const salesPrivatePrices = pgTable("sales_private_prices", {
+  unitId: uuid("unit_id").primaryKey().references(() => salesUnits.id, { onDelete: "restrict" }),
+  askingPrice: numeric("asking_price", { precision: 14, scale: 2 }), minimumPrice: numeric("minimum_price", { precision: 14, scale: 2 }), contractPrice: numeric("contract_price", { precision: 14, scale: 2 }), depositAmount: numeric("deposit_amount", { precision: 14, scale: 2 }), settlementAmount: numeric("settlement_amount", { precision: 14, scale: 2 }),
+  currency: text("currency").default("AUD").notNull(), gstTreatment: text("gst_treatment").default("unconfirmed").notNull(), depositDueAt: timestamp("deposit_due_at", { withTimezone: true }), settlementDueAt: timestamp("settlement_due_at", { withTimezone: true }), ...timestamps,
+}, t => [check("sales_prices_nonnegative", sql`coalesce(${t.askingPrice},0) >= 0 AND coalesce(${t.minimumPrice},0) >= 0 AND coalesce(${t.contractPrice},0) >= 0 AND coalesce(${t.depositAmount},0) >= 0 AND coalesce(${t.settlementAmount},0) >= 0`), check("sales_prices_aud", sql`${t.currency} = 'AUD'`), check("sales_prices_gst", sql`${t.gstTreatment} IN ('unconfirmed','inclusive','exclusive','margin_scheme','not_applicable')`)]);
+
+export const salesPublications = pgTable("sales_publications", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), revision: integer("revision").notNull(), status: publicationStatus("status").default("draft").notNull(), snapshot: jsonb("snapshot").$type<PublicSnapshot>().notNull(), digest: text("digest").notNull(),
+  createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }), approvedByUserId: uuid("approved_by_user_id").references(() => users.id, { onDelete: "restrict" }), publishedByUserId: uuid("published_by_user_id").references(() => users.id, { onDelete: "restrict" }), approvedAt: timestamp("approved_at", { withTimezone: true }), publishedAt: timestamp("published_at", { withTimezone: true }), restoredFromId: uuid("restored_from_id"), ...timestamps,
+}, t => [uniqueIndex("sales_publications_project_revision_unique").on(t.projectId, t.revision), uniqueIndex("sales_publications_project_id_unique").on(t.projectId, t.id)]);
+export const salesProjects = pgTable("sales_projects", {
+  projectId: uuid("project_id").primaryKey().references(() => projects.id, { onDelete: "restrict" }), publicKey: text("public_key").notNull().unique(), expectedUnits: integer("expected_units"), nextRevision: integer("next_revision").default(1).notNull(), publishedPublicationId: uuid("published_publication_id"), enquiriesEnabled: boolean("enquiries_enabled").default(false).notNull(), privacyVersion: text("privacy_version"), privacyNotice: text("privacy_notice"), ...timestamps,
+}, t => [foreignKey({ columns: [t.projectId, t.publishedPublicationId], foreignColumns: [salesPublications.projectId, salesPublications.id] }), check("sales_project_capacity", sql`${t.expectedUnits} IS NULL OR ${t.expectedUnits} BETWEEN 1 AND 10000`)]);
+
+export const salesLeads = pgTable("sales_leads", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), name: text("name").notNull(), email: text("email").notNull(), phone: text("phone"), message: text("message").notNull(), source: text("source").notNull(), status: leadStatus("status").default("new").notNull(),
+  unitIds: jsonb("unit_ids").$type<string[]>().default([]).notNull(), assignedAgentId: uuid("assigned_agent_id").references(() => users.id, { onDelete: "restrict" }), assignedStaffId: uuid("assigned_staff_id").references(() => users.id, { onDelete: "restrict" }), followUpAt: timestamp("follow_up_at", { withTimezone: true }),
+  privacyVersion: text("privacy_version").notNull(), consentAt: timestamp("consent_at", { withTimezone: true }).notNull(), marketingConsent: boolean("marketing_consent").default(false).notNull(), contactPreference: text("contact_preference").default("email").notNull(), revision: integer("revision").default(1).notNull(), ...timestamps,
+}, t => [index("sales_leads_project_followup_idx").on(t.projectId, t.followUpAt), index("sales_leads_agent_idx").on(t.assignedAgentId), index("sales_leads_staff_idx").on(t.assignedStaffId)]);
+export const salesEvents = pgTable("sales_events", {
+  id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), unitId: uuid("unit_id").references(() => salesUnits.id, { onDelete: "restrict" }), leadId: uuid("lead_id").references(() => salesLeads.id, { onDelete: "restrict" }), publicationId: uuid("publication_id").references(() => salesPublications.id, { onDelete: "restrict" }),
+  actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "restrict" }), action: text("action").notNull(), details: jsonb("details").$type<Record<string, unknown>>().default({}).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("sales_events_project_created_idx").on(t.projectId, t.createdAt), index("sales_events_lead_idx").on(t.leadId)]);
+export const salesRateLimits = pgTable("sales_rate_limits", {
+  key: text("key").primaryKey(), bucket: integer("bucket").notNull(), count: integer("count").notNull(), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, t => [index("sales_rate_limits_expiry_idx").on(t.expiresAt)]);

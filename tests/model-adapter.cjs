@@ -58,9 +58,10 @@ test('server rejects malformed state and unsafe dynamic row markup', () => {
 });
 test('financial model and private scenario permissions deny external and unassigned users', () => {
   const model = { projectId: '700', category: 'development_feasibility', status: 'active' };
-  assert.equal(canUseModel({ role: 'external_agent', projects: [{ id: '700' }] }, model), false);
+  assert.equal(canUseModel({ role: 'external_agent', projects: [{ id: '700', membershipRole: 'external_agent' }] }, model), false);
   assert.equal(canUseModel({ role: 'project_manager', projects: [] }, model), false);
-  assert.equal(canUseModel({ role: 'finance', projects: [{ id: '700' }] }, model), true);
+  assert.equal(canUseModel({ role: 'finance', projects: [{ id: '700', membershipRole: 'finance' }] }, model), true);
+  assert.equal(canUseModel({ role: 'finance', projects: [{ id: '700', membershipRole: 'external_agent' }] }, model), false);
   assert.equal(canManageScenario({ role: 'finance', userId: 'alice' }, 'bob'), false);
 });
 
