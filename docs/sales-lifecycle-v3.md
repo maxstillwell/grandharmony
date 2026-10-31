@@ -1,3 +1,7 @@
+# Activation update
+
+0006 is now owner-authorised and applied to Production. Golfview internal lifecycle activation is configured. All existing inventory/private prices remain unchanged. The original gated-foundation report below is historical; it no longer requests migration approval. Automation and public publishing remain separate and inactive.
+
 # Sales Management V3 — implemented foundation, inactive Production transactions
 
 V2 was completed first at `04ea5cc324589f679457013807517e6c5e44af9c`: sortable independent inventory/price columns, functional modal Open/Actions, RBAC and map synchronisation. V3 retains those functions and the original 47 residences/private prices.

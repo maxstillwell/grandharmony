@@ -1,3 +1,7 @@
+# 0006 activation update
+
+The owner subsequently explicitly approved this migration and Golfview activation in the autonomous full-platform assignment. 0006 was applied atomically to existing Production main, its five tables/indexes/journal verified, and the 47 inventory/private-price hash preserved. Internal activation is configured; automation remains disabled. The historical review below records the decisions and implementation boundaries, not a current approval blocker. Snapshot creation was refused by Neon quota; the verified six-hour PITR window and captured pre-DDL time/LSN form the recovery point.
+
 # 0006 owner review — not a Production migration approval
 
 The current assignment says: **“Do NOT apply new schema migrations to Neon Production without explicit owner approval.”** Accordingly this release prepares/tests the migration and keeps transaction entry inactive. Earlier general migration authorisation does not override this specific instruction.
