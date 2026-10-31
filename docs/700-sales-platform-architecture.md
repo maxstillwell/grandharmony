@@ -1,4 +1,4 @@
-# 700 Project Sales Platform — Architecture Decision Record V1 (2026-10-31)
+# Golfview Sales Platform — Architecture Decision Record V1 (2026-10-31)
 
 ## Baseline and verified facts
 - Corporate repository: maxstillwell/grandharmony, main c91dfa7f2d5cedc5a644f2edf77bedd21cc82010; Vercel project grandharmony is production READY on the same commit.
