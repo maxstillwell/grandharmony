@@ -9,6 +9,8 @@ import {
   lifecycleEnabled,
   type TransactionKind,
 } from "./lifecycle-service";
+import { resolveSalesScope } from "./workspace-scope";
+import { createPlatformService } from "./platform-service";
 import { revalidatePath } from "next/cache";
 
 export async function salesAction(
@@ -19,14 +21,40 @@ export async function salesAction(
   const access = await requirePortalAccess();
   if (!validId(projectId)) return { ok: false, error: "Invalid project." };
   try {
+    if (operation.startsWith("lifecycle.") && !lifecycleEnabled(projectId))
+      return {
+        ok: false,
+        error: "Transaction entry is not activated for this project.",
+      };
+    const row = record(input);
+    const scopeKey = await resolveSalesScope(
+      getSalesDb(),
+      access,
+      projectId,
+      row.demo === true,
+    );
+    if (operation.startsWith("platform.")) {
+      if (!lifecycleEnabled(projectId))
+        return {
+          ok: false,
+          error: "Transaction entry is not activated for this project.",
+        };
+      const data = await createPlatformService(getSalesDb(), scopeKey).execute(
+        access,
+        projectId,
+        operation.slice(9),
+        row,
+      );
+      revalidatePath("/portal/sales");
+      return { ok: true, data: data ?? true };
+    }
     if (operation.startsWith("lifecycle.")) {
       if (!lifecycleEnabled(projectId))
         return {
           ok: false,
           error: "Transaction entry is not activated for this project.",
         };
-      const lifecycle = createLifecycleService(getSalesDb()),
-        row = record(input);
+      const lifecycle = createLifecycleService(getSalesDb(), scopeKey);
       const kind = String(row.kind) as TransactionKind;
       if (
         ["lifecycle.save", "lifecycle.transition"].includes(operation) &&
@@ -56,8 +84,7 @@ export async function salesAction(
       revalidatePath("/portal/sales");
       return { ok: true, data: data ?? true };
     }
-    const service = createSalesService(getSalesDb());
-    const row = record(input);
+    const service = createSalesService(getSalesDb(), scopeKey);
     let data: unknown;
     switch (operation) {
       case "configure":

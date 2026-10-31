@@ -1,3 +1,4 @@
+import { assertScope, changeDemoStatus } from "./workspace-scope";
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import type { PortalAccess } from "../auth/access";
@@ -47,10 +48,18 @@ async function event(
   action: string,
   refs: { unitId?: string; leadId?: string; publicationId?: string } = {},
   details: Record<string, unknown> = {},
+  scopeKey = "real",
 ) {
   await db
     .insert(s.salesEvents)
-    .values({ projectId, actorUserId: actor, action, ...refs, details });
+    .values({
+      projectId,
+      scopeKey,
+      actorUserId: actor,
+      action,
+      ...refs,
+      details,
+    });
   // Keep PII and confidential price values out of the shared audit log.
   await db.insert(s.auditLogs).values({
     actorUserId: actor,
@@ -61,7 +70,7 @@ async function event(
         ? "sales_publication"
         : "sales_unit",
     entityId: refs.unitId ?? refs.leadId ?? refs.publicationId ?? projectId,
-    metadata: { projectId },
+    metadata: { projectId, scopeKey },
   });
 }
 async function config(db: Context, projectId: string) {
@@ -115,9 +124,60 @@ async function verifyStages(
       throw new Error("Stage belongs to another project or no longer exists.");
 }
 
-export function createSalesService(db: SalesDb) {
+function activityForRole(
+  rows: (typeof s.salesEvents.$inferSelect)[],
+  access: PortalAccess,
+  projectId: string,
+) {
+  const internal = canSales(access, projectId, "deals.view"),
+    finance = canSales(access, projectId, "prices.view");
+  return rows
+    .filter(
+      (e) =>
+        internal ||
+        (!e.action.startsWith("lifecycle.") &&
+          !e.action.startsWith("platform.")),
+    )
+    .map((e) =>
+      finance
+        ? e
+        : {
+            ...e,
+            details: Object.fromEntries(
+              Object.entries(e.details).filter(([key]) =>
+                [
+                  "from",
+                  "to",
+                  "note",
+                  "interactionType",
+                  "followUpAt",
+                  "lifecycleId",
+                  "revision",
+                  "unitIds",
+                ].includes(key),
+              ),
+            ),
+          },
+    );
+}
+export function createSalesService(db: SalesDb, scopeKey = "real") {
+  const scopedEvent: typeof event = (
+    db,
+    p,
+    a,
+    action,
+    refs = {},
+    details = {},
+  ) => event(db, p, a, action, refs, details, scopeKey);
+  const realOnly = () => {
+    if (scopeKey !== "real")
+      throw Error(
+        "Canonical inventory, pricing, settings and publication are read-only in Demo mode.",
+      );
+  };
   return {
     async configure(access: PortalAccess, projectId: string, input: unknown) {
+      realOnly();
       assertSales(access, projectId, "settings.edit");
       const row = record(input);
       const publicKey = text(row.publicKey, 80, true)!;
@@ -145,6 +205,21 @@ export function createSalesService(db: SalesDb) {
           "Approve a full project privacy notice and policy version before enabling enquiries.",
         );
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
+        await tx
+          .insert(s.salesWorkspaces)
+          .values({
+            projectId,
+            scopeKey: "real",
+            kind: "real",
+            name: "Real business",
+          })
+          .onConflictDoNothing({
+            target: [s.salesWorkspaces.projectId, s.salesWorkspaces.scopeKey],
+          });
         await tx
           .select({ id: s.projects.id })
           .from(s.projects)
@@ -186,10 +261,11 @@ export function createSalesService(db: SalesDb) {
               updatedAt: new Date(),
             },
           });
-        await event(tx, projectId, access.userId, "settings.updated");
+        await scopedEvent(tx, projectId, access.userId, "settings.updated");
       });
     },
     async saveStage(access: PortalAccess, projectId: string, input: unknown) {
+      realOnly();
       assertSales(access, projectId, "inventory.edit");
       const row = record(input);
       if (!["construction", "release"].includes(String(row.kind)))
@@ -211,6 +287,10 @@ export function createSalesService(db: SalesDb) {
       )
         throw new Error("Invalid stage order.");
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         await config(tx, projectId);
         let stageId: string;
         if (row.id) {
@@ -229,7 +309,7 @@ export function createSalesService(db: SalesDb) {
             .returning({ id: table.id });
           stageId = saved.id;
         }
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
@@ -247,9 +327,14 @@ export function createSalesService(db: SalesDb) {
       id?: string,
       expected?: number,
     ) {
+      realOnly();
       assertSales(access, projectId, "inventory.edit");
       const checked = validateUnit(input);
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const settings = await config(tx, projectId);
         await verifyStages(tx, projectId, [checked]);
         const now = new Date();
@@ -274,7 +359,7 @@ export function createSalesService(db: SalesDb) {
             })
             .where(scope(projectId, id))
             .returning();
-          await event(
+          await scopedEvent(
             tx,
             projectId,
             access.userId,
@@ -314,7 +399,7 @@ export function createSalesService(db: SalesDb) {
               ],
             })
             .returning();
-          await event(tx, projectId, access.userId, "unit.created", {
+          await scopedEvent(tx, projectId, access.userId, "unit.created", {
             unitId: result.id,
           });
         }
@@ -327,9 +412,14 @@ export function createSalesService(db: SalesDb) {
       csv: string,
       commit = false,
     ) {
+      realOnly();
       assertSales(access, projectId, "inventory.edit");
       const checked = parseImport(csv);
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const settings = await config(tx, projectId);
         await verifyStages(tx, projectId, checked);
         const existing = await tx
@@ -368,7 +458,7 @@ export function createSalesService(db: SalesDb) {
             )
             .returning({ id: s.salesUnits.id });
           for (const row of rows)
-            await event(tx, projectId, access.userId, "unit.imported", {
+            await scopedEvent(tx, projectId, access.userId, "unit.imported", {
               unitId: row.id,
             });
         }
@@ -383,6 +473,28 @@ export function createSalesService(db: SalesDb) {
       status: string,
       reason: string,
     ) {
+      assertScope(access, projectId, scopeKey);
+      if (scopeKey !== "real")
+        return db.transaction(async (tx) => {
+          await changeDemoStatus(
+            tx as unknown as SalesDb,
+            access,
+            projectId,
+            scopeKey,
+            id,
+            expected,
+            status,
+            reason,
+          );
+          await scopedEvent(
+            tx,
+            projectId,
+            access.userId,
+            "unit.status",
+            { unitId: id },
+            { to: status, reason, demo: true },
+          );
+        });
       assertSales(access, projectId, "status.edit");
       await db.transaction(async (tx) => {
         await config(tx, projectId);
@@ -398,7 +510,7 @@ export function createSalesService(db: SalesDb) {
             updatedByUserId: access.userId,
           })
           .where(scope(projectId, id));
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
@@ -421,6 +533,7 @@ export function createSalesService(db: SalesDb) {
       input: unknown,
       publicPrice = false,
     ) {
+      realOnly();
       assertSales(
         access,
         projectId,
@@ -456,7 +569,7 @@ export function createSalesService(db: SalesDb) {
             updatedByUserId: access.userId,
           })
           .where(scope(projectId, id));
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
@@ -471,9 +584,14 @@ export function createSalesService(db: SalesDb) {
       projectId: string,
       restoreId?: string,
     ) {
+      realOnly();
       assertSales(access, projectId, "inventory.edit");
       if (restoreId) assertSales(access, projectId, "publication.publish");
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const settings = await config(tx, projectId);
         let snapshot: PublicSnapshot;
         if (restoreId) {
@@ -536,7 +654,7 @@ export function createSalesService(db: SalesDb) {
           .update(s.salesProjects)
           .set({ nextRevision: settings.nextRevision + 1 })
           .where(eq(s.salesProjects.projectId, projectId));
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
@@ -553,6 +671,7 @@ export function createSalesService(db: SalesDb) {
       id: string,
       expectedDigest: string,
     ) {
+      realOnly();
       assertSales(access, projectId, "publication.approve");
       await db.transaction(async (tx) => {
         await config(tx, projectId);
@@ -581,12 +700,19 @@ export function createSalesService(db: SalesDb) {
             approvedByUserId: access.userId,
           })
           .where(eq(s.salesPublications.id, id));
-        await event(tx, projectId, access.userId, "publication.approved", {
-          publicationId: id,
-        });
+        await scopedEvent(
+          tx,
+          projectId,
+          access.userId,
+          "publication.approved",
+          {
+            publicationId: id,
+          },
+        );
       });
     },
     async publish(access: PortalAccess, projectId: string, id: string) {
+      realOnly();
       assertSales(access, projectId, "publication.publish");
       await db.transaction(async (tx) => {
         const settings = await config(tx, projectId);
@@ -625,7 +751,7 @@ export function createSalesService(db: SalesDb) {
           .update(s.salesProjects)
           .set({ publishedPublicationId: id, updatedAt: new Date() })
           .where(eq(s.salesProjects.projectId, projectId));
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
@@ -698,8 +824,15 @@ export function createSalesService(db: SalesDb) {
         if (isAgent(access, projectId))
           throw new Error("Agents cannot create unassigned project leads.");
       }
+      if (access) assertScope(access, projectId, scopeKey);
+      else if (scopeKey !== "real")
+        throw Error("Public enquiries cannot use Demo mode.");
       const checked = validateEnquiry(input);
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const settings = await config(tx, projectId);
         if (!access) {
           if (
@@ -774,18 +907,51 @@ export function createSalesService(db: SalesDb) {
           if (units.length !== checked.unitIds.length)
             throw new Error("Interested units must belong to this project.");
         }
+        if (access) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey + ":contacts"}))`,
+          );
+          const duplicates = await tx
+            .select({ id: s.salesLeads.id })
+            .from(s.salesLeads)
+            .where(
+              and(
+                eq(s.salesLeads.projectId, projectId),
+                eq(s.salesLeads.scopeKey, scopeKey),
+                or(
+                  sql`lower(${s.salesLeads.email})=lower(${checked.email})`,
+                  checked.phone
+                    ? sql`regexp_replace(coalesce(${s.salesLeads.phone},''),'[^0-9]','','g')=regexp_replace(${checked.phone},'[^0-9]','','g')`
+                    : undefined,
+                ),
+              ),
+            );
+          if (duplicates.length)
+            throw Error(
+              "A buyer with this email or phone already exists in this workspace. Search CRM and update the existing record.",
+            );
+        }
         const [lead] = await tx
           .insert(s.salesLeads)
           .values({
             projectId,
+            scopeKey,
             ...checked,
-            source: access ? "portal" : "golfview",
+            source: access
+              ? (text(record(input).source, 100) ?? "portal")
+              : "golfview",
             consentAt: new Date(),
           })
           .returning({ id: s.salesLeads.id });
-        await event(tx, projectId, access?.userId ?? null, "lead.created", {
-          leadId: lead.id,
-        });
+        await scopedEvent(
+          tx,
+          projectId,
+          access?.userId ?? null,
+          "lead.created",
+          {
+            leadId: lead.id,
+          },
+        );
         return lead.id;
       });
     },
@@ -797,16 +963,25 @@ export function createSalesService(db: SalesDb) {
       input: unknown,
     ) {
       assertSales(access, projectId, "crm.edit");
+      assertScope(access, projectId, scopeKey);
       revision(expected);
       const row = record(input);
       if (!leadStatuses.includes(row.status as (typeof leadStatuses)[number]))
         throw new Error("Invalid lead status.");
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const [lead] = await tx
           .select()
           .from(s.salesLeads)
           .where(
-            and(eq(s.salesLeads.projectId, projectId), eq(s.salesLeads.id, id)),
+            and(
+              eq(s.salesLeads.projectId, projectId),
+              eq(s.salesLeads.scopeKey, scopeKey),
+              eq(s.salesLeads.id, id),
+            ),
           )
           .for("update");
         if (
@@ -881,10 +1056,57 @@ export function createSalesService(db: SalesDb) {
           if (units.length !== unitIds.length)
             throw new Error("Interested units must belong to this project.");
         }
+        const contact = {
+          name: row.name === undefined ? lead.name : text(row.name, 200, true)!,
+          email:
+            row.email === undefined ? lead.email : text(row.email, 254, true)!,
+          phone: row.phone === undefined ? lead.phone : text(row.phone, 80),
+          source:
+            row.source === undefined
+              ? lead.source
+              : text(row.source, 100, true)!,
+        };
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email))
+          throw Error("Invalid buyer email.");
+        if (contact.email !== lead.email || contact.phone !== lead.phone) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey + ":contacts"}))`,
+          );
+          const existing = await tx
+            .select({ id: s.salesLeads.id })
+            .from(s.salesLeads)
+            .where(
+              and(
+                eq(s.salesLeads.projectId, projectId),
+                eq(s.salesLeads.scopeKey, scopeKey),
+                sql`${s.salesLeads.id}<>${id}`,
+                or(
+                  sql`lower(${s.salesLeads.email})=lower(${contact.email})`,
+                  contact.phone
+                    ? sql`regexp_replace(coalesce(${s.salesLeads.phone},''),'[^0-9]','','g')=regexp_replace(${contact.phone},'[^0-9]','','g')`
+                    : undefined,
+                ),
+              ),
+            );
+          if (existing.length)
+            throw Error("Another buyer already uses this email or phone.");
+        }
+        const interactionType = String(row.interactionType ?? "note");
+        if (
+          ![
+            "note",
+            "call",
+            "meeting",
+            "email_record",
+            "qualification",
+          ].includes(interactionType)
+        )
+          throw Error("Invalid interaction type.");
         const note = text(row.note, 4000);
         await tx
           .update(s.salesLeads)
           .set({
+            ...contact,
             status: row.status as typeof lead.status,
             assignedAgentId,
             assignedStaffId,
@@ -894,13 +1116,14 @@ export function createSalesService(db: SalesDb) {
             updatedAt: new Date(),
           })
           .where(eq(s.salesLeads.id, id));
-        await event(
+        await scopedEvent(
           tx,
           projectId,
           access.userId,
           "lead.updated",
           { leadId: id },
           {
+            interactionType,
             from: lead.status,
             to: row.status,
             assignedAgentId,
@@ -914,6 +1137,7 @@ export function createSalesService(db: SalesDb) {
     },
     async leadActivity(access: PortalAccess, projectId: string, id: string) {
       assertSales(access, projectId, "crm.view");
+      assertScope(access, projectId, scopeKey);
       const [lead] = await db
         .select({
           assignedAgentId: s.salesLeads.assignedAgentId,
@@ -921,7 +1145,11 @@ export function createSalesService(db: SalesDb) {
         })
         .from(s.salesLeads)
         .where(
-          and(eq(s.salesLeads.projectId, projectId), eq(s.salesLeads.id, id)),
+          and(
+            eq(s.salesLeads.projectId, projectId),
+            eq(s.salesLeads.scopeKey, scopeKey),
+            eq(s.salesLeads.id, id),
+          ),
         );
       if (
         !lead ||
@@ -930,46 +1158,49 @@ export function createSalesService(db: SalesDb) {
           lead.assignedStaffId !== access.userId)
       )
         throw new Error("Lead is not accessible.");
-      return db
+      const rows = await db
         .select()
         .from(s.salesEvents)
         .where(
           and(
             eq(s.salesEvents.projectId, projectId),
+            eq(s.salesEvents.scopeKey, scopeKey),
             eq(s.salesEvents.leadId, id),
-            sql`${s.salesEvents.action} not like 'lifecycle.%'`,
           ),
         )
         .orderBy(desc(s.salesEvents.createdAt));
+      return activityForRole(rows, access, projectId);
     },
     async unitActivity(access: PortalAccess, projectId: string, id: string) {
       assertSales(access, projectId, "audit.view");
+      assertScope(access, projectId, scopeKey);
       if (!validId(id)) throw new Error("Invalid residence.");
       const [unit] = await db
         .select({ id: s.salesUnits.id })
         .from(s.salesUnits)
         .where(scope(projectId, id));
       if (!unit) throw new Error("Residence was not found in this project.");
-      return db
+      const rows = await db
         .select()
         .from(s.salesEvents)
         .where(
           and(
             eq(s.salesEvents.projectId, projectId),
+            eq(s.salesEvents.scopeKey, scopeKey),
             eq(s.salesEvents.unitId, id),
-            sql`${s.salesEvents.leadId} is null`,
           ),
         )
         .orderBy(desc(s.salesEvents.createdAt))
         .limit(200);
+      return activityForRole(rows, access, projectId);
     },
     async workspace(access: PortalAccess, projectId: string) {
-      assertSales(access, projectId, "inventory.view");
+      assertScope(access, projectId, scopeKey);
       const [settings] = await db
         .select()
         .from(s.salesProjects)
         .where(eq(s.salesProjects.projectId, projectId));
-      const units = isAgent(access, projectId)
+      let units = isAgent(access, projectId)
         ? []
         : await db
             .select()
@@ -986,6 +1217,7 @@ export function createSalesService(db: SalesDb) {
         : [];
       const leadScope = and(
         eq(s.salesLeads.projectId, projectId),
+        eq(s.salesLeads.scopeKey, scopeKey),
         isAgent(access, projectId)
           ? or(
               eq(s.salesLeads.assignedAgentId, access.userId),
@@ -1000,7 +1232,7 @@ export function createSalesService(db: SalesDb) {
             .where(leadScope)
             .orderBy(desc(s.salesLeads.updatedAt))
         : [];
-      const prices = canSales(access, projectId, "prices.view")
+      let prices = canSales(access, projectId, "prices.view")
         ? await db
             .select({
               unitId: s.salesPrivatePrices.unitId,
@@ -1020,22 +1252,23 @@ export function createSalesService(db: SalesDb) {
             )
             .where(eq(s.salesUnits.projectId, projectId))
         : [];
-      const financeReport = canSales(access, projectId, "prices.view")
-        ? await db
-            .select({
-              gstTreatment: s.salesPrivatePrices.gstTreatment,
-              contractTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.contractPrice}),0)::text`,
-              depositTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.depositAmount}),0)::text`,
-              settlementTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.settlementAmount}),0)::text`,
-            })
-            .from(s.salesPrivatePrices)
-            .innerJoin(
-              s.salesUnits,
-              eq(s.salesUnits.id, s.salesPrivatePrices.unitId),
-            )
-            .where(eq(s.salesUnits.projectId, projectId))
-            .groupBy(s.salesPrivatePrices.gstTreatment)
-        : [];
+      const financeReport =
+        scopeKey === "real" && canSales(access, projectId, "prices.view")
+          ? await db
+              .select({
+                gstTreatment: s.salesPrivatePrices.gstTreatment,
+                contractTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.contractPrice}),0)::text`,
+                depositTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.depositAmount}),0)::text`,
+                settlementTotalAud: sql<string>`coalesce(sum(${s.salesPrivatePrices.settlementAmount}),0)::text`,
+              })
+              .from(s.salesPrivatePrices)
+              .innerJoin(
+                s.salesUnits,
+                eq(s.salesUnits.id, s.salesPrivatePrices.unitId),
+              )
+              .where(eq(s.salesUnits.projectId, projectId))
+              .groupBy(s.salesPrivatePrices.gstTreatment)
+          : [];
       const construction = !isAgent(access, projectId)
         ? await db
             .select()
@@ -1057,6 +1290,7 @@ export function createSalesService(db: SalesDb) {
             .where(
               and(
                 eq(s.salesEvents.projectId, projectId),
+                eq(s.salesEvents.scopeKey, scopeKey),
                 sql`${s.salesEvents.leadId} is null`,
               ),
             )
@@ -1082,6 +1316,30 @@ export function createSalesService(db: SalesDb) {
       const publicData = settings
         ? await this.publicInventory(settings.publicKey)
         : null;
+      if (scopeKey !== "real") {
+        const overlays = await db
+          .select()
+          .from(s.salesDemoUnitState)
+          .where(
+            and(
+              eq(s.salesDemoUnitState.projectId, projectId),
+              eq(s.salesDemoUnitState.scopeKey, scopeKey),
+            ),
+          );
+        units = units.map((u) => {
+          const o = overlays.find((o) => o.unitId === u.id);
+          return o ? { ...u, status: o.status, revision: o.revision } : u;
+        });
+        prices = prices.map((p) => {
+          const o = overlays.find((o) => o.unitId === p.unitId);
+          return {
+            ...p,
+            contractPrice: o?.contractPrice ?? null,
+            depositAmount: o?.depositAmount ?? null,
+            settlementAmount: null,
+          };
+        });
+      }
       return {
         agent: isAgent(access, projectId),
         settings: isAgent(access, projectId) ? null : (settings ?? null),
@@ -1093,7 +1351,7 @@ export function createSalesService(db: SalesDb) {
         financeReport,
         construction,
         release,
-        history,
+        history:activityForRole(history,access,projectId),
         publicData,
         permissions: Object.fromEntries(
           [
@@ -1133,7 +1391,8 @@ export function createSalesService(db: SalesDb) {
         throw new Error("Agents cannot export project registers.");
       const workspace = await this.workspace(access, projectId);
       if (kind === "leads")
-        return csvExport(workspace.leads, [
+        return csvExport(workspace.leads.map(r=>({...r,transactionMode:scopeKey==="real"?"REAL":"DEMO"})), [
+          "transactionMode",
           "id",
           "name",
           "email",
@@ -1149,7 +1408,8 @@ export function createSalesService(db: SalesDb) {
         ]);
       if (kind === "prices") {
         assertSales(access, projectId, "prices.view");
-        return csvExport(workspace.prices, [
+        return csvExport(workspace.prices.map(r=>({...r,transactionMode:scopeKey==="real"?"REAL":"DEMO"})), [
+          "transactionMode",
           "unitId",
           "askingPrice",
           "minimumPrice",
@@ -1161,7 +1421,8 @@ export function createSalesService(db: SalesDb) {
           "settlementDueAt",
         ]);
       }
-      return csvExport(workspace.units, [
+      return csvExport(workspace.units.map(r=>({...r,transactionMode:scopeKey==="real"?"REAL":"DEMO"})), [
+        "transactionMode",
         "id",
         "number",
         "lot",

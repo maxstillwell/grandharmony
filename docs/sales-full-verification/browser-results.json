@@ -1,0 +1,18 @@
+{
+  "passed": 11,
+  "tests": [
+    "47 canonical residences are visible; demo inventory details are read-only and map selection uses existing residence IDs",
+    "Buyer creation, residence interest, source, qualification, Sydney follow-up and call timeline persist through real services",
+    "Explicit offer draft, submission and management acceptance do not sign contracts or alter genuine availability",
+    "Authorised reservation activation persists independently; no mandatory duration, fee or payment is invented",
+    "Contract registration stores independent agreed price, deposit target, due date, solicitor and document reference",
+    "Deposit and settlement receipts create immutable evidence; settlement completion is explicit and distinct from received cash",
+    "Existing project identity is linked to configurable commission agreement; exact contract-based GST calculation and explicit obligation approval work",
+    "Demo reports reconcile contract value, cash, balance, lead sources and agent performance; protected service CSV export downloads",
+    "Internal buyer follow-up tasks can be completed and reopened without external messaging",
+    "390px mobile reports and contract controls remain functional without page overflow",
+    "Controlled demo reset removes only own simulated records; 47 genuine fixture residences, prices, original CRM and publication remain byte-for-byte unchanged"
+  ],
+  "pageErrors": [],
+  "scope": "Browser -> real application services -> isolated PGlite, synthetic records only. Authenticated Production acceptance pending."
+}

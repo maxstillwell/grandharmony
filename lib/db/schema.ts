@@ -83,11 +83,13 @@ export const salesProjects = pgTable("sales_projects", {
 }, t => [foreignKey({ columns: [t.projectId, t.publishedPublicationId], foreignColumns: [salesPublications.projectId, salesPublications.id] }), check("sales_project_capacity", sql`${t.expectedUnits} IS NULL OR ${t.expectedUnits} BETWEEN 1 AND 10000`)]);
 
 export const salesLeads = pgTable("sales_leads", {
+  scopeKey: text("scope_key").default("real").notNull(),
   id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), name: text("name").notNull(), email: text("email").notNull(), phone: text("phone"), message: text("message").notNull(), source: text("source").notNull(), status: leadStatus("status").default("new").notNull(),
   unitIds: jsonb("unit_ids").$type<string[]>().default([]).notNull(), assignedAgentId: uuid("assigned_agent_id").references(() => users.id, { onDelete: "restrict" }), assignedStaffId: uuid("assigned_staff_id").references(() => users.id, { onDelete: "restrict" }), followUpAt: timestamp("follow_up_at", { withTimezone: true }),
   privacyVersion: text("privacy_version").notNull(), consentAt: timestamp("consent_at", { withTimezone: true }).notNull(), marketingConsent: boolean("marketing_consent").default(false).notNull(), contactPreference: text("contact_preference").default("email").notNull(), revision: integer("revision").default(1).notNull(), ...timestamps,
 }, t => [index("sales_leads_project_followup_idx").on(t.projectId, t.followUpAt), index("sales_leads_agent_idx").on(t.assignedAgentId), index("sales_leads_staff_idx").on(t.assignedStaffId)]);
 export const salesEvents = pgTable("sales_events", {
+  scopeKey: text("scope_key").default("real").notNull(),
   id: uuid("id").defaultRandom().primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "restrict" }), unitId: uuid("unit_id").references(() => salesUnits.id, { onDelete: "restrict" }), leadId: uuid("lead_id").references(() => salesLeads.id, { onDelete: "restrict" }), publicationId: uuid("publication_id").references(() => salesPublications.id, { onDelete: "restrict" }),
   actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "restrict" }), action: text("action").notNull(), details: jsonb("details").$type<Record<string, unknown>>().default({}).notNull(), createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, t => [index("sales_events_project_created_idx").on(t.projectId, t.createdAt), index("sales_events_lead_idx").on(t.leadId)]);
@@ -95,9 +97,10 @@ export const salesRateLimits = pgTable("sales_rate_limits", {
   key: text("key").primaryKey(), bucket: integer("bucket").notNull(), count: integer("count").notNull(), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, t => [index("sales_rate_limits_expiry_idx").on(t.expiresAt)]);
 
-// V3 lifecycle: additive tables only. Production access stays feature-gated until
-// the owner approves 0006 and explicitly activates the project workflow.
+// Internal lifecycle tables. Activation is project scoped; public publication is separate.
 export const salesBuyerProfiles = pgTable("sales_buyer_profiles", {
+  preferredTypes: jsonb("preferred_types").$type<string[]>().default([]).notNull(),
+  scopeKey: text("scope_key").default("real").notNull(),
   leadId: uuid("lead_id")
     .primaryKey()
     .references(() => salesLeads.id, { onDelete: "restrict" }),
@@ -115,6 +118,7 @@ export const salesBuyerProfiles = pgTable("sales_buyer_profiles", {
   ...timestamps,
 });
 export const salesOffers = pgTable("sales_offers", {
+  scopeKey: text("scope_key").default("real").notNull(),
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id")
     .notNull()
@@ -143,6 +147,8 @@ export const salesOffers = pgTable("sales_offers", {
   ...timestamps,
 });
 export const salesReservations = pgTable("sales_reservations", {
+  feeAmount: numeric("fee_amount",{precision:14,scale:2}),
+  scopeKey: text("scope_key").default("real").notNull(),
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id")
     .notNull()
@@ -169,6 +175,8 @@ export const salesReservations = pgTable("sales_reservations", {
   ...timestamps,
 });
 export const salesContracts = pgTable("sales_contracts", {
+  depositPercentage: numeric("deposit_percentage",{precision:7,scale:4}), depositDueAt: timestamp("deposit_due_at",{withTimezone:true}), financeCondition: text("finance_condition"), otherConditions: text("other_conditions"), unconditionalAt: timestamp("unconditional_at",{withTimezone:true}), solicitorName: text("solicitor_name"), solicitorEmail: text("solicitor_email"), solicitorPhone: text("solicitor_phone"),
+  scopeKey: text("scope_key").default("real").notNull(),
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id")
     .notNull()
@@ -215,8 +223,8 @@ export const salesContracts = pgTable("sales_contracts", {
   ...timestamps,
 });
 export const salesLifecycleSettings = pgTable("sales_lifecycle_settings", {
-  projectId: uuid("project_id")
-    .primaryKey()
+  scopeKey: text("scope_key").default("real").notNull(),
+  projectId: uuid("project_id").notNull()
     .references(() => projects.id),
   proposedDurationHours: integer("proposed_duration_hours"),
   proposedReservationFee: numeric("proposed_reservation_fee", {
@@ -229,4 +237,13 @@ export const salesLifecycleSettings = pgTable("sales_lifecycle_settings", {
     .notNull()
     .references(() => users.id),
   ...timestamps,
-});
+}, (t)=>[primaryKey({columns:[t.projectId,t.scopeKey]})]);
+
+export const salesWorkspaces=pgTable("sales_workspaces",{id:uuid("id").defaultRandom().primaryKey(),projectId:uuid("project_id").notNull().references(()=>projects.id),scopeKey:text("scope_key").notNull(),kind:text("kind").notNull(),name:text("name").notNull(),createdByUserId:uuid("created_by_user_id").references(()=>users.id),...timestamps},t=>[uniqueIndex("sales_workspaces_project_scope_unique").on(t.projectId,t.scopeKey)]);
+export const salesDemoUnitState=pgTable("sales_demo_unit_state",{projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").notNull(),unitId:uuid("unit_id").notNull(),status:salesStatus("status").notNull(),revision:integer("revision").notNull(),contractPrice:numeric("contract_price",{precision:14,scale:2}),depositAmount:numeric("deposit_amount",{precision:14,scale:2}),...timestamps},t=>[primaryKey({columns:[t.projectId,t.scopeKey,t.unitId]})]);
+export const salesAgents=pgTable("sales_agents",{id:uuid("id").defaultRandom().primaryKey(),projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),userId:uuid("user_id").notNull().references(()=>users.id),displayName:text("display_name").notNull(),company:text("company"),email:text("email"),phone:text("phone"),notes:text("notes"),revision:integer("revision").default(1).notNull(),updatedByUserId:uuid("updated_by_user_id").notNull().references(()=>users.id),...timestamps},t=>[uniqueIndex("sales_agent_scope_user_unique").on(t.projectId,t.scopeKey,t.userId)]);
+export const salesCommissionAgreements=pgTable("sales_commission_agreements",{id:uuid("id").defaultRandom().primaryKey(),projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),agentId:uuid("agent_id").notNull(),kind:text("kind").notNull(),rate:numeric("rate",{precision:7,scale:4}),fixedAmount:numeric("fixed_amount",{precision:14,scale:2}),gstTreatment:text("gst_treatment").notNull(),gstRate:numeric("gst_rate",{precision:7,scale:4}),payableMilestone:text("payable_milestone").default("manual").notNull(),documentReference:text("document_reference"),notes:text("notes"),revision:integer("revision").default(1).notNull(),updatedByUserId:uuid("updated_by_user_id").notNull().references(()=>users.id),...timestamps});
+export const salesCommissions=pgTable("sales_commissions",{id:uuid("id").defaultRandom().primaryKey(),projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),agentId:uuid("agent_id").notNull(),agreementId:uuid("agreement_id").notNull(),contractId:uuid("contract_id").notNull(),estimatedAmount:numeric("estimated_amount",{precision:14,scale:2}).notNull(),gstAmount:numeric("gst_amount",{precision:14,scale:2}),approvedAmount:numeric("approved_amount",{precision:14,scale:2}),paidAmount:numeric("paid_amount",{precision:14,scale:2}),paidAt:timestamp("paid_at",{withTimezone:true}),paymentReference:text("payment_reference"),status:text("status").default("estimated").notNull(),basis:jsonb("basis").$type<Record<string,unknown>>().notNull(),revision:integer("revision").default(1).notNull(),updatedByUserId:uuid("updated_by_user_id").notNull().references(()=>users.id),...timestamps});
+export const salesCashEntries=pgTable("sales_cash_entries",{id:uuid("id").defaultRandom().primaryKey(),projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),contractId:uuid("contract_id").notNull(),category:text("category").notNull(),amount:numeric("amount",{precision:14,scale:2}).notNull(),receivedAt:timestamp("received_at",{withTimezone:true}).notNull(),reference:text("reference").notNull(),reason:text("reason").notNull(),actorUserId:uuid("actor_user_id").notNull().references(()=>users.id),createdAt:timestamp("created_at",{withTimezone:true}).defaultNow().notNull()});
+export const salesReleasePlans=pgTable("sales_release_plans",{projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),stageId:uuid("stage_id").notNull(),plannedAt:timestamp("planned_at",{withTimezone:true}),targetUnits:integer("target_units"),targetValue:numeric("target_value",{precision:14,scale:2}),pricingNote:text("pricing_note"),revision:integer("revision").default(1).notNull(),updatedByUserId:uuid("updated_by_user_id").notNull().references(()=>users.id),...timestamps},t=>[primaryKey({columns:[t.projectId,t.scopeKey,t.stageId]})]);
+export const salesTaskStates=pgTable("sales_task_states",{projectId:uuid("project_id").notNull(),scopeKey:text("scope_key").default("real").notNull(),userId:uuid("user_id").notNull().references(()=>users.id),taskKey:text("task_key").notNull(),snoozedUntil:timestamp("snoozed_until",{withTimezone:true}),completedAt:timestamp("completed_at",{withTimezone:true}),...timestamps},t=>[primaryKey({columns:[t.projectId,t.scopeKey,t.userId,t.taskKey]})]);

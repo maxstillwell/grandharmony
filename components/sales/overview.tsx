@@ -57,7 +57,7 @@ export function Overview({ data, lifecycle, onOpenLifecycle }: Shared) {
                 active reservations ·{" "}
                 {
                   lifecycle.data.contracts.filter((r) =>
-                    ["signed", "unconditional"].includes(r.status),
+                    ["signed", "conditional", "unconditional"].includes(r.status),
                   ).length
                 }{" "}
                 signed / unconditional contracts.

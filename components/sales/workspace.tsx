@@ -12,15 +12,21 @@ import { Publishing } from "./publishing";
 import { Settings } from "./settings";
 import { LifecycleWorkspace, LifecyclePolicy } from "./lifecycle";
 import type { LifecycleState } from "@/lib/sales/lifecycle-access";
+import { PlatformWorkspace } from "./platform";
+import type { PlatformData } from "@/lib/sales/platform-service";
 import { Crm } from "./crm";
 export function SalesWorkspace({
   data,
+  demo = false,
+  platform,
   projectId,
   projectName,
   projects = [],
   reviewPlan,
   lifecycle = { enabled: false, data: null },
 }: {
+  platform?: PlatformData;
+  demo?: boolean;
   data: Data;
   projectId: string;
   projectName: string;
@@ -53,7 +59,10 @@ export function SalesWorkspace({
         setFailed(false);
       }
       try {
-        const result = await salesAction(projectId, operation, input);
+        const result = await salesAction(projectId, operation, {
+          ...input,
+          demo,
+        });
         if (!result.ok) throw new Error(result.error);
         if (!reading)
           setMessage(
@@ -76,9 +85,10 @@ export function SalesWorkspace({
         }
       }
     },
-    [projectId, router],
+    [projectId, router, demo],
   );
   const shared = {
+    demo,
     data,
     run,
     pending: pending || refreshing,
@@ -117,21 +127,37 @@ export function SalesWorkspace({
     "Overview",
     "Inventory",
     ...(!data.agent ? ["Explorer / Map"] : []),
-    ...(data.permissions["inventory.edit"]
+    ...(!demo && data.permissions["inventory.edit"]
       ? ["Pricing / Releases", "Import"]
       : []),
-    ...(data.publications.length || data.permissions["inventory.edit"]
+    ...(!demo &&
+    (data.publications.length || data.permissions["inventory.edit"])
       ? ["Publishing"]
       : []),
     ...(data.permissions["crm.view"] ? ["Leads / CRM"] : []),
     ...(data.permissions["deals.view"]
-      ? ["Deals", "Contracts", "Settlement Tracking"]
+      ? [
+          "Deals",
+          "Contracts",
+          "Settlement Tracking",
+          ...(platform
+            ? [
+                "Agents",
+                "Commissions",
+                "Finance tools",
+                "Release planning",
+                "Analytics",
+                "Reports",
+                "Tasks",
+              ]
+            : []),
+        ]
       : []),
     ...(data.permissions["audit.view"] ? ["Activity / Audit"] : []),
     ...(data.permissions["settings.edit"] ? ["Settings"] : []),
   ];
   return (
-    <main className="portal-page">
+    <main className="portal-page sales-workspace">
       <div className="portal-page-inner">
         <header className="portal-page-title">
           <p className="portal-kicker">Grand Harmony / Sales Management</p>
@@ -167,6 +193,26 @@ export function SalesWorkspace({
             not publish them.
           </p>
         </header>
+        {data.permissions["deals.view"] && !data.agent && (
+          <section className="portal-card mb-6" aria-label="Transaction mode">
+            <strong>
+              {demo
+                ? "DEMO / TEST TRANSACTIONS — not genuine business"
+                : "REAL BUSINESS RECORDS"}
+            </strong>
+            <p className="portal-helper">
+              {demo
+                ? "Real residences and asking prices are read-only. Buyers, transactions, simulated availability and reports are isolated to your demo workspace. No payments or customer communications are executed."
+                : "Genuine business data. Use Demo mode to practise transactions safely."}
+            </p>
+            <a
+              className="portal-button"
+              href={`/portal/sales?project=${projectId}${demo ? "" : "&mode=demo"}`}
+            >
+              {demo ? "Return to real business" : "Enter Demo / Test mode"}
+            </a>
+          </section>
+        )}
         <nav aria-label="Sales workspace" className="mb-6 flex flex-wrap gap-2">
           {tabs.map((item) => (
             <button
@@ -198,7 +244,35 @@ export function SalesWorkspace({
             </p>
           </section>
         )}
-        {tab === "Overview" && <Overview {...shared} />}
+        {tab === "Overview" && (
+          <>
+            <Overview {...shared} />
+            {platform && (
+              <PlatformWorkspace
+                shared={shared}
+                p={platform}
+                area="Analytics"
+              />
+            )}
+          </>
+        )}
+        {platform &&
+          [
+            "Agents",
+            "Commissions",
+            "Finance tools",
+            "Release planning",
+            "Analytics",
+            "Reports",
+            "Tasks",
+          ].includes(tab) && (
+            <PlatformWorkspace
+              key={tab}
+              shared={shared}
+              p={platform}
+              area={tab}
+            />
+          )}
         {tab === "Inventory" && <Inventory {...shared} />}
         {tab === "Explorer / Map" && <Inventory {...shared} mapOnly />}
         {tab === "Pricing / Releases" && <Stages {...shared} />}
@@ -209,7 +283,7 @@ export function SalesWorkspace({
         )}
         {tab === "Settings" && (
           <>
-            <Settings {...shared} />
+            {!demo && <Settings {...shared} />}
             <LifecyclePolicy shared={shared} />
           </>
         )}

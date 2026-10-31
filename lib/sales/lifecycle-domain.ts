@@ -15,10 +15,12 @@ export const reservationTransitions: Record<string, readonly string[]> = {
 };
 export const contractTransitions: Record<string, readonly string[]> = {
   draft: ["signed", "cancelled"],
-  signed: ["unconditional", "cancelled"],
-  unconditional: ["completed", "cancelled"],
+  signed: ["conditional", "unconditional", "terminated", "cancelled"],
+  conditional: ["unconditional", "terminated", "cancelled"],
+  unconditional: ["completed", "terminated", "cancelled"],
   completed: [],
   cancelled: [],
+  terminated: [],
 };
 export function cents(value: string | null | undefined) {
   if (!value) return 0n;
@@ -72,6 +74,7 @@ export function reservationInput(input: unknown) {
     offerId: identifier(r.offerId, true),
     startsAt,
     expiresAt,
+    feeAmount: decimal(r.feeAmount),
     notes: text(r.notes, 4000),
   };
 }
@@ -107,6 +110,13 @@ export function contractInput(input: unknown) {
     actualSettlementAt,
     contractPrice,
     depositAmount,
+    depositPercentage: decimal(r.depositPercentage),
+    depositDueAt: dateOrNull(r.depositDueAt),
+    financeCondition: text(r.financeCondition, 4000),
+    otherConditions: text(r.otherConditions, 4000),
+    solicitorName: text(r.solicitorName, 200),
+    solicitorEmail: text(r.solicitorEmail, 254),
+    solicitorPhone: text(r.solicitorPhone, 80),
     documentReference: text(r.documentReference, 1000),
     notes: text(r.notes, 4000),
   };
@@ -137,7 +147,7 @@ export type ContractRow = {
 };
 export function settlementSummary(rows: ContractRow[], now = new Date()) {
   const active = rows.filter((r) =>
-    ["signed", "unconditional", "completed"].includes(r.status),
+    ["signed", "conditional", "unconditional", "completed"].includes(r.status),
   );
   let contracted = 0n,
     receipts = 0n,
@@ -150,7 +160,8 @@ export function settlementSummary(rows: ContractRow[], now = new Date()) {
     const cash =
       cents(r.depositReceivedAmount) + cents(r.settlementReceivedAmount);
     receipts += cash;
-    if (r.status === "cancelled") cancelledReceipts += cash;
+    if (["cancelled", "terminated"].includes(r.status))
+      cancelledReceipts += cash;
   }
   for (const r of active) {
     const price = cents(r.contractPrice),
@@ -173,6 +184,9 @@ export function settlementSummary(rows: ContractRow[], now = new Date()) {
   }
   return {
     contracted: amount(contracted),
+    depositsExpected:amount(active.reduce((n,c)=>n+cents(c.depositAmount),0n)),
+    depositsConfirmed:amount(rows.reduce((n,c)=>n+cents(c.depositReceivedAmount),0n)),
+    settlementConfirmed:amount(rows.reduce((n,c)=>n+cents(c.settlementReceivedAmount),0n)),
     confirmedReceipts: amount(receipts),
     cancelledContractReceipts: amount(cancelledReceipts),
     outstandingDeposits: amount(depositsDue),

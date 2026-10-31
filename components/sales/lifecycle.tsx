@@ -93,6 +93,40 @@ export function LifecycleWorkspace({
   const openUnit = (id: string) => shared.onOpenUnit?.(id);
   return (
     <>
+      {area === "Deals" && (
+        <section className="portal-card">
+          <h2>Offer pipeline</h2>
+          <div className={styles.summary}>
+            {["draft", "submitted", "accepted", "rejected", "withdrawn"].map(
+              (status) => (
+                <span key={status}>
+                  <strong>
+                    {data.offers.filter((o) => o.status === status).length}
+                  </strong>
+                  {label(status)}
+                </span>
+              ),
+            )}
+            <span>
+              <strong>
+                {
+                  data.offers.filter(
+                    (o) =>
+                      o.status === "submitted" &&
+                      o.expiresAt &&
+                      new Date(o.expiresAt) < new Date(),
+                  ).length
+                }
+              </strong>
+              Expired · manual decision
+            </span>
+          </div>
+          <p className="portal-helper">
+            Acceptance is a recorded decision; it does not sign a contract or
+            complete a sale.
+          </p>
+        </section>
+      )}
       {area === "Settlement Tracking" && (
         <section className="portal-card">
           <p className="portal-kicker">Confirmed facts, not cash forecasts</p>
@@ -332,7 +366,7 @@ export function LifecycleWorkspace({
               <p className="portal-helper">
                 Residence{" "}
                 {shared.data.units.find((u) => u.id === record.unitId)?.number}{" "}
-                · Revision {record.revision}. Canonical inventory status:{" "}
+                · Revision {record.revision}. {shared.demo ? "Demo inventory status:" : "Canonical inventory status:"}{" "}
                 {label(
                   shared.data.units.find((u) => u.id === record.unitId)
                     ?.status ?? "unknown",
@@ -463,7 +497,7 @@ export function LifecycleWorkspace({
             )}
           {record &&
             kind === "contract" &&
-            ["signed", "unconditional", "completed"].includes(record.status) &&
+            ["signed", "conditional", "unconditional", "completed"].includes(record.status) &&
             shared.data.permissions["settlement.edit"] &&
             shared.data.permissions["prices.edit"] && (
               <form
@@ -692,6 +726,14 @@ function TransactionEditor({
             />
           </>
         )}
+        {kind === "reservation" && (
+          <Field
+            name="feeAmount"
+            label="Optional reservation fee · AUD (not received cash)"
+            type="number"
+            value={value("feeAmount") as string}
+          />
+        )}
         {kind === "contract" && (
           <>
             <Field
@@ -761,6 +803,49 @@ function TransactionEditor({
           />
         )}
       </div>
+      {kind === "contract" && shared.data.permissions["prices.view"] && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field
+            name="depositPercentage"
+            label="Agreed deposit percentage (optional)"
+            type="number"
+            value={value("depositPercentage") as string}
+          />
+          <Field
+            name="depositDueAt"
+            label="Deposit due · Sydney"
+            type="datetime-local"
+            value={date(value("depositDueAt") as Date | null)}
+            instant={value("depositDueAt")}
+          />
+          <Field
+            name="solicitorName"
+            label="Conveyancer / solicitor"
+            value={value("solicitorName") as string}
+          />
+          <Field
+            name="solicitorEmail"
+            label="Solicitor email"
+            type="email"
+            value={value("solicitorEmail") as string}
+          />
+          <Field
+            name="solicitorPhone"
+            label="Solicitor phone"
+            value={value("solicitorPhone") as string}
+          />
+          <Area
+            name="financeCondition"
+            label="Finance condition"
+            value={value("financeCondition") as string}
+          />
+          <Area
+            name="otherConditions"
+            label="Other contract conditions"
+            value={value("otherConditions") as string}
+          />
+        </div>
+      )}
       {kind === "offer" && (
         <Area
           name="conditions"
@@ -948,6 +1033,11 @@ export function BuyerPreferences({
               value={profile?.budgetMax}
             />
           </div>
+          <Field
+            name="preferredTypes"
+            label="Preferred residence types · comma separated"
+            value={profile?.preferredTypes.join(", ")}
+          />
           <Area
             name="nextAction"
             label="Next action"

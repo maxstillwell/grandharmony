@@ -17,6 +17,18 @@ import { money, statusPresentation } from "./inventory-status";
 import styles from "./inventory.module.css";
 
 export function Inventory(shared: Shared & { mapOnly?: boolean }) {
+  const inventoryData = shared.demo
+    ? {
+        ...shared.data,
+        permissions: {
+          ...shared.data.permissions,
+          "prices.edit": false,
+          "publicPrices.edit": false,
+          "inventory.edit": false,
+        },
+      }
+    : shared.data;
+  shared = { ...shared, data: inventoryData };
   const { data, projectId } = shared;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -39,21 +51,48 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
     Boolean(shared.mapOnly || shared.openUnitId),
   );
   const published = new Set(data.publicData?.units.map((u) => u.id) ?? []);
-  const filtered = data.units.filter(
-    (u) =>
-      `${u.number} ${u.lot ?? ""} ${u.housingType ?? ""} ${u.features.join(" ")}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) &&
-      (!status || u.status === status) &&
-      (!construction || u.constructionStageId === construction) &&
-      (!release || u.releaseStageId === release) &&
-      (!publication ||
-        (publication === "published"
-          ? published.has(u.id)
-          : publication === "unpublished"
-            ? !published.has(u.id)
-            : u.publicVisible)),
-  );
+  const transactionText = (id: string) => {
+    const life = shared.lifecycle?.data;
+    const hold = life?.reservations.find(
+        (r) => r.unitId === id && r.status === "active",
+      ),
+      contract = life?.contracts.find(
+        (c) =>
+          c.unitId === id &&
+          ["signed", "conditional", "unconditional", "completed"].includes(
+            c.status,
+          ),
+      );
+    const person = data.assignees.find(
+      (a) => a.id === (contract?.agentId ?? hold?.agentId),
+    );
+    return (
+      [
+        hold ? "Active reservation" : null,
+        contract ? `Contract ${contract.status}` : null,
+        person?.name,
+      ]
+        .filter(Boolean)
+        .join(" · ") || "No active transaction"
+    );
+  };
+  const filtered = data.units
+    .map((u) => ({ ...u, transactionStatus: transactionText(u.id) }))
+    .filter(
+      (u) =>
+        `${u.number} ${u.lot ?? ""} ${u.housingType ?? ""} ${u.features.join(" ")} ${u.transactionStatus}`
+          .toLowerCase()
+          .includes(search.toLowerCase()) &&
+        (!status || u.status === status) &&
+        (!construction || u.constructionStageId === construction) &&
+        (!release || u.releaseStageId === release) &&
+        (!publication ||
+          (publication === "published"
+            ? published.has(u.id)
+            : publication === "unpublished"
+              ? !published.has(u.id)
+              : u.publicVisible)),
+    );
   const units = sortInventory(
     filtered,
     sort,
@@ -88,6 +127,9 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
             numeric: true,
           },
         ]
+      : []),
+    ...(shared.lifecycle?.enabled
+      ? [{ title: "Transactions / agent", key: "transactionStatus" as const }]
       : []),
     { title: "Tags", key: "features" },
     { title: "Publication" },
@@ -154,7 +196,7 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
             {data.units.length > 0 && (
               <a
                 className="portal-button"
-                href={`/api/portal/projects/${projectId}/sales/export`}
+                href={`/api/portal/projects/${projectId}/sales/export${shared.demo ? "?mode=demo" : ""}`}
               >
                 Export inventory CSV
               </a>
@@ -391,6 +433,18 @@ export function Inventory(shared: Shared & { mapOnly?: boolean }) {
                           </small>
                         </td>
                       </>
+                    )}
+                    {shared.lifecycle?.enabled && (
+                      <td>
+                        <button
+                          className="text-left underline"
+                          onClick={() =>
+                            shared.onOpenLifecycle?.("Deals", u.id)
+                          }
+                        >
+                          {u.transactionStatus}
+                        </button>
+                      </td>
                     )}
                     <td>
                       {u.features.slice(0, 2).map((tag, i) => (

@@ -1,0 +1,53 @@
+# Internal Sales Management — end-to-end release
+
+This release extends the existing Sales Management architecture. It does not replace inventory, authentication, project membership, CRM or the publication snapshot API. Golfview's public website and Codex B geometry are untouched.
+
+## Production schema and activation
+
+- Owner-authorised `0006_sales_lifecycle.sql` applied to Neon `shiny-tooth-37334133`, Production `main` / `br-royal-firefly-a7acoiq6`, database `neondb`.
+- Golfview lifecycle activated using existing Production environment flags, project UUID `44290fcb-17c7-4677-9053-d7402b10f863`. Activation/docs commit: `5add8a0dc47ded89d42128ee55fda31adbb3a851`; Vercel Production deployment `dpl_qPwKXxviMZHeAunh7nNS77bjg66v` reached READY.
+- Additive, backward-compatible `0007_sales_complete.sql` applied atomically after a migration-history guard and populated-inventory migration tests. SHA-256 `003b10f6625729c6e68ccaeaaedf0601d7fc5cd342c6fdb10ed6a1fc5a5fcae4`, journal timestamp `1793455000000`; verified exactly once, eight total migration entries.
+- New tables: workspaces, demo unit state, agent profiles, commission agreements, commission register, immutable cash ledger, release plans and personal task states. Existing lifecycle and CRM tables gain an explicit `real`/per-user-demo scope. Scope-matching foreign keys prevent mixing genuine/demo buyers and transactions. Active reservation/contract uniqueness remains enforced per residence and scope.
+- Existing rows default to `real`; canonical residences and private asking prices have no demo copies. Demo inventory updates use an overlay referencing canonical residence UUIDs.
+- Recovery preflight verified six-hour Neon PITR retention. Pre-0007 point: `2026-10-31T14:07:26.834Z`, WAL `0/260CE70`. An attempted pre-0006 additional snapshot was refused by the account snapshot quota; no existing recovery resources were deleted. PITR points are time-limited, not permanent backups. No Production restore was attempted.
+- Before/after preservation guards verified unchanged global inventory, private prices, CRM, publication snapshots and sales settings. Golfview: 47 residences, 47 non-null asking prices, all unreleased/unpublished; no public price or publication created. Unit 1 remains A-1C with DESIGN CONFLICT and public exclusion. Production offers/reservations/contracts remained empty after migration; no synthetic genuine records were inserted.
+
+The checked-in SQL is authoritative for the composite scope constraints, partial indexes and immutable-ledger trigger. The ORM snapshot supports future generation; never replace reviewed SQL with a schema push.
+
+## Working modules
+
+- Inventory/map: original sortable inventory, filters, pricing permissions and selection retained. Active reservation/contract/agent context is searchable and sortable; explicit working-status updates flow to the same canonical/overlaid residence. Publication remains independent.
+- CRM: contact editing, lead source/status/qualification, project-member assignment, multiple residence interests, budgets/bedroom/type preferences, follow-ups, typed call/meeting/note records and buyer/residence navigation. Internal duplicate checks normalise email/phone under a project/scope transaction lock. Customer public submissions remain disabled by existing publication/privacy/token controls.
+- CRM import: quoted CSV, explicit consent, dry-run, duplicate reporting and atomic additive commit; no overwrite or inferred consent. Template columns are shown in the UI. Exports remain permission checked.
+- Offers: draft editing, submission, management acceptance/rejection, withdrawal, expiry visibility, conditions, private references, comparison table and audit history. Acceptance does not sign or settle a sale.
+- Reservations: draft/activation/cancel/release/manual expiry, optional dates and fee, conflict protection. No fee, duration, cash movement or automatic expiry is assumed. Lifecycle settings store explicit operator proposals without activating automation.
+- Contracts: draft, signed, conditional, unconditional, completed and cancelled/terminated distinctions; agreed contract price remains independent of asking/advertising price. Deposit percentage/target/due date, finance/other conditions, solicitor contacts, settlement dates and document references are recorded. Management/finance amendments retain before/after evidence, revisions and asking prices. Future signature/actual-settlement dates are rejected.
+- Finance: cumulative confirmed deposit/settlement evidence, exact decimal reconciliation, immutable signed correction entries, contract balance and settlement schedule. Cancelled contracts retain cash evidence; refunds/bank transfers are never executed.
+- Agents: directory attached to existing active project identities, company/contact profiles, associated residences/buyers/deals and contract performance. Profiles grant no identity or permissions; existing Administration controls project membership and roles.
+- Commissions: explicit fixed/percentage agreements, configured GST treatment/rate, manual/signed/unconditional/settled approval milestones, contract-based estimates, separate approved obligations and confirmed payment evidence. No default commission/GST rate. Private arrangements are withheld from non-finance payloads and exports.
+- Release planning: existing construction and sales release stages remain independent; approved assignments, optional dates/targets/value/pricing notes and stage progress. No assignments or releases invented.
+- Dashboard/reports: actual inventory and transaction counts, asking value, contract revenue, deposits expected/received, settlement cash, outstanding amounts, stage/agent/source conversion and settlement tables, monthly progress, filters, permission-checked CSV and browser Print/Save as PDF. Genuine and Demo reports never aggregate together. Transaction exports apply dashboard filters; inventory/price/buyer registers are complete authorised registers, clearly described in the UI. Date filters use creation date UTC; sales-velocity/monthly views use contract dates.
+- Tasks: in-app follow-ups, decisions, reservation expiry, deposit/settlement milestones, personal completion/reopen/snooze. Customer messaging is disabled; `lib/sales/messaging.ts` defines the provider integration contract without credentials or sends.
+- Audit/RBAC: project membership/global-role intersection retained, scoped history, financial redaction, optimistic revisions, database transactions, reservation/contract uniqueness and concurrent receipt protection. Shared audit logs contain identifiers/scope, not private amounts or buyer notes.
+
+## Owner demonstration
+
+1. Sign in normally at `https://www.grandharmony.com.au/portal/sales`, select Golfview, click **Enter Demo / Test mode**. The persistent DEMO banner identifies your personal workspace; real inventory/asking prices are read-only.
+2. CRM: create a clearly named test buyer using an `example.invalid` address, choose residences, record a call, source, qualification, preferences and follow-up. Demo consent fields apply to simulated records only.
+3. Deals: create, submit and explicitly accept a test offer. Create and activate a reservation. Leave fees/expiry blank if not supplied.
+4. Contracts: create a draft with explicit test price/date, optional deposit and a clearly marked test document reference. Assign an existing authorised project member if testing commission. Record the signature facts explicitly; no legal agreement is executed.
+5. Record simulated deposit/settlement receipt evidence. Transition to unconditional/completed with an actual simulated past date. Transaction registration is separate from working inventory status; the optional sync action only permits existing legal status transitions. To demonstrate map status changes from unreleased inventory, explicitly progress Demo inventory through available → reserved → contract issued before signing/syncing; no real residence is changed.
+6. Agents: add/edit a profile for that same existing project member. Commissions: create an explicit agreement, estimate against the test contract, approve only after its configured milestone, optionally record simulated payment evidence. These are internal evidence records, not bank instructions.
+7. Review buyer/residence timelines, Finance tools, Tasks and Demo dashboards. Download a **DEMO** CSV or Print/Save as PDF. Use Finance tools to append receipt corrections or record a documented contract amendment.
+8. Reports → **Reset my Demo transactions** → type `RESET MY DEMO`. This deletes only your scoped simulation; genuine inventory, prices, publications, other users' demos and shared audit logs remain intact.
+9. **Return to real business** before reviewing genuine records. Genuine registers stay empty until authorised real business entries are made.
+
+## Verification and limits
+
+- Lint, TypeScript and production build passed; all 73 automated service/database tests passed.
+- `tests/sales-platform.cjs` exercises both migrations, populated 47-unit preservation, full Demo lifecycle/commission, real/demo and multi-project isolation, duplicate contacts/import, financial redaction, append-only corrections, conditional-contract conflicts, personal reset, optimistic/concurrent receipt changes and role/export restrictions.
+- `scripts/sales-full-harness.mjs` creates a disposable loopback-only Next.js app using the actual UI/services against independent PGlite. Its `/api/test` and reset handler are generated outside this repository application and are not deployed. All identities, prices and evidence in screenshots are synthetic and visibly labelled.
+- Full browser flow: 11 checks; original V3 transaction (7), V2 inventory (10) and original inventory/import (9) regressions also passed: 37 browser checks in total, zero uncaught page exceptions. Evidence: `docs/sales-full-verification/`.
+- Authenticated Production browser acceptance is pending. No public share link, new credential, protection bypass or sharing change was created. Vercel deployment status/SHA and Neon schema/data verification are separate from live authenticated UI acceptance.
+- Legal signing, bank payments/refunds, automatic expiry, SMS/email delivery and legal-document content generation are intentionally not executed. Existing media/document references are reused; no new document storage infrastructure was created.
+- A person may record an authorised decision under existing RBAC; a separate maker/checker identity workflow has not been introduced. Historical genuine contract cancellation retains canonical financial values for manual reconciliation instead of silently clearing them.

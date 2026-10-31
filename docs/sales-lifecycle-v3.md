@@ -1,3 +1,5 @@
+> Superseded follow-on release: [Internal Sales Management end-to-end release](sales-management-full.md). 0006 and 0007 are applied and Golfview is internally activated; the older gate/correction limitations below describe the historical V3 baseline.
+
 # Activation update
 
 0006 is now owner-authorised and applied to Production. Golfview internal lifecycle activation is configured. All existing inventory/private prices remain unchanged. The original gated-foundation report below is historical; it no longer requests migration approval. Automation and public publishing remain separate and inactive.

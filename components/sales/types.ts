@@ -10,6 +10,7 @@ export type Run = (
   input: Record<string, unknown>,
 ) => Promise<unknown>;
 export type Shared = {
+  demo?: boolean;
   data: Data;
   run: Run;
   pending: boolean;

@@ -23,6 +23,12 @@ export function Crm({
   initialLeadId = null,
   ...sharedExtra
 }: Shared & { initialLeadId?: string | null }) {
+  const [buyerCsv, setBuyerCsv] = useState("");
+  const [importResult, setImportResult] = useState<{
+    count: number;
+    errors: string[];
+    committed: boolean;
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [followFilter, setFollowFilter] = useState("");
@@ -79,7 +85,7 @@ export function Crm({
           {data.permissions["crm.export"] && (
             <a
               className="portal-button"
-              href={`/api/portal/projects/${projectId}/sales/export?kind=leads`}
+              href={`/api/portal/projects/${projectId}/sales/export?kind=leads${sharedExtra.demo ? "&mode=demo" : ""}`}
             >
               Export authorised CRM CSV
             </a>
@@ -206,6 +212,71 @@ export function Crm({
           <p className="portal-empty">No leads in your authorised scope.</p>
         )}
       </section>
+      {data.permissions["leads.assign"] && sharedExtra.lifecycle?.enabled && (
+        <details className="portal-card">
+          <summary className="cursor-pointer">
+            Import consented buyers · validate before saving
+          </summary>
+          <p className="portal-helper">
+            Adds new buyers only; duplicate emails or phones must be resolved in
+            CRM. Maximum 100 rows. Consent must be evidenced; do not infer it.
+          </p>
+          <p className="my-3 overflow-auto text-xs">
+            name,email,phone,source,message,privacyVersion,consent,marketingConsent,contactPreference
+          </p>
+          <textarea
+            aria-label="Buyer import CSV"
+            className="my-3 w-full border p-3"
+            rows={6}
+            value={buyerCsv}
+            onChange={(e) => {
+              setBuyerCsv(e.target.value);
+              setImportResult(null);
+            }}
+          />
+          <button
+            className="portal-button"
+            disabled={pending || !buyerCsv}
+            onClick={async () => {
+              const r = await run("platform.crmImport", {
+                csv: buyerCsv,
+                commit: false,
+              });
+              if (r && typeof r === "object")
+                setImportResult(r as typeof importResult);
+            }}
+          >
+            Validate buyer CSV
+          </button>
+          {importResult && (
+            <div role="status">
+              <p>
+                {importResult.count} rows · {importResult.errors.length} errors
+                · {importResult.committed ? "Imported" : "Not saved"}
+              </p>
+              {importResult.errors.map((e, i) => (
+                <p key={i}>{e}</p>
+              ))}
+              {!importResult.errors.length && !importResult.committed && (
+                <button
+                  className="portal-button"
+                  disabled={pending}
+                  onClick={async () => {
+                    const r = await run("platform.crmImport", {
+                      csv: buyerCsv,
+                      commit: true,
+                    });
+                    if (r && typeof r === "object")
+                      setImportResult(r as typeof importResult);
+                  }}
+                >
+                  Confirm validated buyer import
+                </button>
+              )}
+            </div>
+          )}
+        </details>
+      )}
       {selected && (
         <section className="portal-card">
           <button
@@ -255,6 +326,39 @@ export function Crm({
                     });
                   }}
                 >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field
+                      name="name"
+                      label="Buyer name"
+                      value={lead.name}
+                      required
+                    />
+                    <Field
+                      name="email"
+                      label="Email"
+                      type="email"
+                      value={lead.email}
+                      required
+                    />
+                    <Field name="phone" label="Phone" value={lead.phone} />
+                    <Field
+                      name="source"
+                      label="Lead source"
+                      value={lead.source}
+                      required
+                    />
+                  </div>
+                  <Select
+                    name="interactionType"
+                    label="Contact record type"
+                    options={options([
+                      "note",
+                      "call",
+                      "meeting",
+                      "email_record",
+                      "qualification",
+                    ])}
+                  />
                   <Select
                     name="status"
                     label="Lead status"
@@ -315,7 +419,11 @@ export function Crm({
                   {activity.map((event) => (
                     <li className="space-y-2 py-4 text-sm" key={event.id}>
                       <strong>
-                        {label(event.action.replaceAll(".", " "))}
+                        {label(
+                          String(
+                            event.details.interactionType ?? event.action,
+                          ).replaceAll(".", " "),
+                        )}
                       </strong>
                       <p className="text-xs">
                         {displaySalesDate(event.createdAt)} Sydney
@@ -363,6 +471,7 @@ export function Crm({
               <Field name="name" label="Customer name" required />
               <Field name="email" label="Email" type="email" required />
               <Field name="phone" label="Phone (optional)" />
+              <Field name="source" label="Lead source" value="portal" />
               <Area name="message" label="Enquiry" required />
               <UnitChoices units={data.units} />
               <Field

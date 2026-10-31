@@ -1,3 +1,4 @@
+import { assertScope, demoUnit } from "./workspace-scope";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { PortalAccess } from "../auth/access";
 import * as s from "../db/schema";
@@ -55,6 +56,8 @@ async function linked(
   unitId: string,
   leadId: string,
   agentId: string | null,
+  scopeKey = "real",
+  access?: PortalAccess,
 ) {
   const [unit] = await tx
     .select()
@@ -67,12 +70,24 @@ async function linked(
     .select()
     .from(s.salesLeads)
     .where(
-      and(eq(s.salesLeads.projectId, projectId), eq(s.salesLeads.id, leadId)),
+      and(
+        eq(s.salesLeads.projectId, projectId),
+        eq(s.salesLeads.scopeKey, scopeKey),
+        eq(s.salesLeads.id, leadId),
+      ),
     );
   if (!unit || !lead)
     throw Error("Residence and buyer must belong to this project.");
   await member(tx, projectId, agentId);
-  return unit;
+  return scopeKey !== "real" && access
+    ? await demoUnit(
+        tx as unknown as SalesDb,
+        access,
+        projectId,
+        scopeKey,
+        unitId,
+      )
+    : unit;
 }
 async function reference(
   tx: Tx,
@@ -81,13 +96,16 @@ async function reference(
   kind: "offer" | "reservation",
   unitId: string,
   leadId: string,
+  scopeKey = "real",
 ) {
   if (!id) return;
   const t = tables[kind];
   const [r] = await tx
     .select()
     .from(t)
-    .where(and(eq(t.projectId, projectId), eq(t.id, id)));
+    .where(
+      and(eq(t.projectId, projectId), eq(t.scopeKey, scopeKey), eq(t.id, id)),
+    );
   if (!r || r.unitId !== unitId || r.leadId !== leadId)
     throw Error("Related transaction belongs to another residence or buyer.");
 }
@@ -100,6 +118,7 @@ async function audit(
   unitId: string | null,
   leadId: string | null,
   details: Record<string, unknown> = {},
+  scopeKey = "real",
 ) {
   await recordSalesEvent(
     tx,
@@ -108,32 +127,51 @@ async function audit(
     `lifecycle.${kind}`,
     { ...(unitId ? { unitId } : {}), ...(leadId ? { leadId } : {}) },
     { lifecycleId: id, ...details },
+    scopeKey,
   );
 }
 function expected(current: number, value: unknown) {
   if (!Number.isInteger(Number(value)) || Number(value) !== current)
     throw Error("Record changed. Reload before saving.");
 }
-export function createLifecycleService(db: SalesDb) {
+export function createLifecycleService(db: SalesDb, scopeKey = "real") {
+  const scopedAudit: typeof audit = (tx, p, a, k, id, u, l, details = {}) =>
+    audit(tx, p, a, k, id, u, l, details, scopeKey);
   return {
     async workspace(access: PortalAccess, projectId: string) {
+      assertScope(access, projectId, scopeKey);
       assertSales(access, projectId, "deals.view");
       if (isAgent(access, projectId))
         throw Error("Internal transaction access only.");
       const offers = await db
         .select()
         .from(s.salesOffers)
-        .where(eq(s.salesOffers.projectId, projectId))
+        .where(
+          and(
+            eq(s.salesOffers.projectId, projectId),
+            eq(s.salesOffers.scopeKey, scopeKey),
+          ),
+        )
         .orderBy(desc(s.salesOffers.updatedAt));
       const reservations = await db
         .select()
         .from(s.salesReservations)
-        .where(eq(s.salesReservations.projectId, projectId))
+        .where(
+          and(
+            eq(s.salesReservations.projectId, projectId),
+            eq(s.salesReservations.scopeKey, scopeKey),
+          ),
+        )
         .orderBy(desc(s.salesReservations.updatedAt));
       const raw = await db
         .select()
         .from(s.salesContracts)
-        .where(eq(s.salesContracts.projectId, projectId))
+        .where(
+          and(
+            eq(s.salesContracts.projectId, projectId),
+            eq(s.salesContracts.scopeKey, scopeKey),
+          ),
+        )
         .orderBy(desc(s.salesContracts.updatedAt));
       const contracts = canSales(access, projectId, "prices.view")
         ? raw
@@ -146,24 +184,44 @@ export function createLifecycleService(db: SalesDb) {
             notes: null,
             documentReference: null,
             receiptReference: null,
+            depositPercentage: null,
+            depositDueAt: null,
+            financeCondition: null,
+            otherConditions: null,
+            solicitorName: null,
+            solicitorEmail: null,
+            solicitorPhone: null,
           }));
       const profiles = canSales(access, projectId, "crm.view")
         ? await db
             .select()
             .from(s.salesBuyerProfiles)
-            .where(eq(s.salesBuyerProfiles.projectId, projectId))
+            .where(
+              and(
+                eq(s.salesBuyerProfiles.projectId, projectId),
+                eq(s.salesBuyerProfiles.scopeKey, scopeKey),
+              ),
+            )
         : [];
       const [settings] = await db
         .select()
         .from(s.salesLifecycleSettings)
-        .where(eq(s.salesLifecycleSettings.projectId, projectId));
+        .where(
+          and(
+            eq(s.salesLifecycleSettings.projectId, projectId),
+            eq(s.salesLifecycleSettings.scopeKey, scopeKey),
+          ),
+        );
       const history = canSales(access, projectId, "audit.view")
         ? await db
             .select()
             .from(s.salesEvents)
             .where(
               and(
-                eq(s.salesEvents.projectId, projectId),
+                and(
+                  eq(s.salesEvents.projectId, projectId),
+                  eq(s.salesEvents.scopeKey, scopeKey),
+                ),
                 sql`${s.salesEvents.action} like 'lifecycle.%'`,
               ),
             )
@@ -204,9 +262,14 @@ export function createLifecycleService(db: SalesDb) {
         projectId,
         kind === "contract" ? "contracts.edit" : "deals.edit",
       );
+      assertScope(access, projectId, scopeKey);
       const row = record(input),
         t = tables[kind];
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const previous = row.id
           ? (
               await tx
@@ -214,7 +277,7 @@ export function createLifecycleService(db: SalesDb) {
                 .from(t)
                 .where(
                   and(
-                    eq(t.projectId, projectId),
+                    and(eq(t.projectId, projectId), eq(t.scopeKey, scopeKey)),
                     eq(t.id, identifier(row.id)!),
                   ),
                 )
@@ -252,6 +315,8 @@ export function createLifecycleService(db: SalesDb) {
           parsed.unitId,
           parsed.leadId,
           parsed.agentId,
+          scopeKey,
+          access,
         );
         if (kind !== "offer")
           await reference(
@@ -261,6 +326,7 @@ export function createLifecycleService(db: SalesDb) {
             "offer",
             parsed.unitId,
             parsed.leadId,
+            scopeKey,
           );
         if (kind === "contract") {
           const c = parsed as ReturnType<typeof contractInput>,
@@ -272,6 +338,7 @@ export function createLifecycleService(db: SalesDb) {
             "reservation",
             c.unitId,
             c.leadId,
+            scopeKey,
           );
           if (
             row.contractPrice !== undefined ||
@@ -290,6 +357,13 @@ export function createLifecycleService(db: SalesDb) {
               throw Error("Private contract details require financial access.");
             c.documentReference = old?.documentReference ?? null;
             c.notes = old?.notes ?? null;
+            c.depositPercentage = old?.depositPercentage ?? null;
+            c.depositDueAt = old?.depositDueAt ?? null;
+            c.financeCondition = old?.financeCondition ?? null;
+            c.otherConditions = old?.otherConditions ?? null;
+            c.solicitorName = old?.solicitorName ?? null;
+            c.solicitorEmail = old?.solicitorEmail ?? null;
+            c.solicitorPhone = old?.solicitorPhone ?? null;
           }
           if (
             c.contractPrice &&
@@ -298,7 +372,12 @@ export function createLifecycleService(db: SalesDb) {
           )
             throw Error("Deposit exceeds contract price.");
         }
-        const values = { ...parsed, projectId, updatedByUserId: access.userId };
+        const values = {
+          ...parsed,
+          projectId,
+          scopeKey,
+          updatedByUserId: access.userId,
+        };
         let id: string;
         if (previous) {
           await tx
@@ -321,7 +400,7 @@ export function createLifecycleService(db: SalesDb) {
               .returning({ id: t.id })
           )[0].id;
         }
-        await audit(
+        await scopedAudit(
           tx,
           projectId,
           access.userId,
@@ -341,6 +420,7 @@ export function createLifecycleService(db: SalesDb) {
       id: string,
       input: unknown,
     ) {
+      assertScope(access, projectId, scopeKey);
       const row = record(input),
         to = String(row.status),
         t = tables[kind];
@@ -350,10 +430,19 @@ export function createLifecycleService(db: SalesDb) {
         kind === "contract" ? "contracts.edit" : "deals.edit",
       );
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const [r] = await tx
           .select()
           .from(t)
-          .where(and(eq(t.projectId, projectId), eq(t.id, identifier(id)!)))
+          .where(
+            and(
+              and(eq(t.projectId, projectId), eq(t.scopeKey, scopeKey)),
+              eq(t.id, identifier(id)!),
+            ),
+          )
           .for("update");
         if (!r) throw Error("Transaction not found.");
         expected(r.revision, row.revision);
@@ -367,7 +456,23 @@ export function createLifecycleService(db: SalesDb) {
               : contractTransitions,
           row,
         );
-        const unit = await linked(tx, projectId, r.unitId, r.leadId, r.agentId);
+        if (kind === "reservation" && to === "expired") {
+          const expiry = (r as typeof s.salesReservations.$inferSelect)
+            .expiresAt;
+          if (!expiry || expiry > new Date())
+            throw Error(
+              "Reservation cannot be marked expired before its recorded expiry. Use a manual cancellation or release instead.",
+            );
+        }
+        const unit = await linked(
+          tx,
+          projectId,
+          r.unitId,
+          r.leadId,
+          r.agentId,
+          scopeKey,
+          access,
+        );
         const approval =
           (kind === "offer" &&
             (["accepted", "rejected"].includes(to) ||
@@ -400,10 +505,14 @@ export function createLifecycleService(db: SalesDb) {
                 .from(s.salesContracts)
                 .where(
                   and(
-                    eq(s.salesContracts.projectId, projectId),
+                    and(
+                      eq(s.salesContracts.projectId, projectId),
+                      eq(s.salesContracts.scopeKey, scopeKey),
+                    ),
                     eq(s.salesContracts.unitId, r.unitId),
                     inArray(s.salesContracts.status, [
                       "signed",
+                      "conditional",
                       "unconditional",
                     ]),
                   ),
@@ -416,7 +525,10 @@ export function createLifecycleService(db: SalesDb) {
             .from(s.salesReservations)
             .where(
               and(
-                eq(s.salesReservations.projectId, projectId),
+                and(
+                  eq(s.salesReservations.projectId, projectId),
+                  eq(s.salesReservations.scopeKey, scopeKey),
+                ),
                 eq(s.salesReservations.unitId, r.unitId),
                 eq(s.salesReservations.status, "active"),
               ),
@@ -447,6 +559,8 @@ export function createLifecycleService(db: SalesDb) {
             throw Error(
               "Contract date, explicit agreed price and private document reference are required.",
             );
+          if (c.contractDate > new Date())
+            throw Error("A future contract cannot be recorded as signed.");
           if (["settled", "withdrawn"].includes(unit.status))
             throw Error("Inventory status does not permit contract signing.");
           const conflicting = await tx
@@ -454,7 +568,10 @@ export function createLifecycleService(db: SalesDb) {
             .from(s.salesReservations)
             .where(
               and(
-                eq(s.salesReservations.projectId, projectId),
+                and(
+                  eq(s.salesReservations.projectId, projectId),
+                  eq(s.salesReservations.scopeKey, scopeKey),
+                ),
                 eq(s.salesReservations.unitId, r.unitId),
                 eq(s.salesReservations.status, "active"),
               ),
@@ -462,42 +579,74 @@ export function createLifecycleService(db: SalesDb) {
           if (conflicting.some((a) => a.leadId !== r.leadId))
             throw Error("Another buyer has an active reservation.");
           assertSales(access, projectId, "prices.edit");
-          const [privatePrices] = await tx
-            .select()
-            .from(s.salesPrivatePrices)
-            .where(eq(s.salesPrivatePrices.unitId, unit.id));
-          if (
-            privatePrices?.contractPrice !== null &&
-            privatePrices?.contractPrice !== undefined
-          )
-            throw Error(
-              "Existing canonical contract price requires reconciliation before registering another contract.",
+          if (scopeKey !== "real") {
+            const current = await demoUnit(
+              tx as unknown as SalesDb,
+              access,
+              projectId,
+              scopeKey,
+              unit.id,
             );
-          if (
-            privatePrices?.depositAmount &&
-            privatePrices.depositAmount !== c.depositAmount
-          )
-            throw Error(
-              "Existing deposit target must be reconciled before signing.",
+            expected(current.revision, row.unitRevision);
+            if (current.contractPrice !== null)
+              throw Error(
+                "An existing demo contract price needs reconciliation.",
+              );
+            await tx
+              .update(s.salesDemoUnitState)
+              .set({
+                contractPrice: c.contractPrice,
+                depositAmount: c.depositAmount,
+                revision: current.revision + 1,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(s.salesDemoUnitState.projectId, projectId),
+                  eq(s.salesDemoUnitState.scopeKey, scopeKey),
+                  eq(s.salesDemoUnitState.unitId, unit.id),
+                ),
+              );
+          } else {
+            const [privatePrices] = await tx
+              .select()
+              .from(s.salesPrivatePrices)
+              .where(eq(s.salesPrivatePrices.unitId, unit.id));
+            if (
+              privatePrices?.contractPrice !== null &&
+              privatePrices?.contractPrice !== undefined
+            )
+              throw Error(
+                "Existing canonical contract price requires reconciliation before registering another contract.",
+              );
+            if (
+              privatePrices?.depositAmount &&
+              privatePrices.depositAmount !== c.depositAmount
+            )
+              throw Error(
+                "Existing deposit target must be reconciled before signing.",
+              );
+            expected(unit.revision, row.unitRevision);
+            await createSalesService(tx as unknown as SalesDb).savePrices(
+              access,
+              projectId,
+              unit.id,
+              unit.revision,
+              {
+                ...privatePrices,
+                contractPrice: c.contractPrice,
+                depositAmount: c.depositAmount,
+              },
             );
-          expected(unit.revision, row.unitRevision);
-          await createSalesService(tx as unknown as SalesDb).savePrices(
-            access,
-            projectId,
-            unit.id,
-            unit.revision,
-            {
-              ...privatePrices,
-              contractPrice: c.contractPrice,
-              depositAmount: c.depositAmount,
-            },
-          );
+          }
         }
         let actualSettlementAt: Date | null | undefined;
         if (kind === "contract" && to === "completed") {
           actualSettlementAt = dateOrNull(row.actualSettlementAt);
-          if (!actualSettlementAt)
-            throw Error("Actual settlement date is required.");
+          if (!actualSettlementAt || actualSettlementAt > new Date())
+            throw Error(
+              "Actual settlement date is required and cannot be in the future.",
+            );
           const c = r as typeof s.salesContracts.$inferSelect;
           if (c.contractDate && actualSettlementAt < c.contractDate)
             throw Error("Settlement cannot precede contract date.");
@@ -523,7 +672,10 @@ export function createLifecycleService(db: SalesDb) {
               ? unit.revision + 1
               : unit.revision;
           expected(unit.revision, row.unitRevision);
-          await createSalesService(tx as unknown as SalesDb).changeStatus(
+          await createSalesService(
+            tx as unknown as SalesDb,
+            scopeKey,
+          ).changeStatus(
             access,
             projectId,
             unit.id,
@@ -540,9 +692,12 @@ export function createLifecycleService(db: SalesDb) {
             updatedAt: new Date(),
             updatedByUserId: access.userId,
             ...(actualSettlementAt ? { actualSettlementAt } : {}),
+            ...(kind === "contract" && to === "unconditional"
+              ? { unconditionalAt: new Date() }
+              : {}),
           })
           .where(eq(t.id, id));
-        await audit(
+        await scopedAudit(
           tx,
           projectId,
           access.userId,
@@ -566,6 +721,7 @@ export function createLifecycleService(db: SalesDb) {
       id: string,
       input: unknown,
     ) {
+      assertScope(access, projectId, scopeKey);
       assertSales(access, projectId, "settlement.edit");
       assertSales(access, projectId, "prices.edit");
       const row = record(input);
@@ -578,17 +734,29 @@ export function createLifecycleService(db: SalesDb) {
       if (!["deposit", "settlement"].includes(String(row.kind)))
         throw Error("Invalid receipt kind.");
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const [c] = await tx
           .select()
           .from(s.salesContracts)
           .where(
             and(
-              eq(s.salesContracts.projectId, projectId),
+              and(
+                eq(s.salesContracts.projectId, projectId),
+                eq(s.salesContracts.scopeKey, scopeKey),
+              ),
               eq(s.salesContracts.id, identifier(id)!),
             ),
           )
           .for("update");
-        if (!c || !["signed", "unconditional", "completed"].includes(c.status))
+        if (
+          !c ||
+          !["signed", "conditional", "unconditional", "completed"].includes(
+            c.status,
+          )
+        )
           throw Error("Receipts require a recorded signed contract.");
         expected(c.revision, row.revision);
         if (receivedAt > new Date())
@@ -610,6 +778,23 @@ export function createLifecycleService(db: SalesDb) {
           throw Error(
             "Receipt totals cannot be reduced through this workflow. Record a separate approved correction.",
           );
+        const oldTotal =
+          row.kind === "deposit"
+            ? c.depositReceivedAmount
+            : c.settlementReceivedAmount;
+        const delta = cents(value) - cents(oldTotal);
+        if (delta > 0n)
+          await tx.insert(s.salesCashEntries).values({
+            projectId,
+            scopeKey,
+            contractId: id,
+            category: String(row.kind),
+            amount: `${delta / 100n}.${String(delta % 100n).padStart(2, "0")}`,
+            receivedAt,
+            reference: receiptReference!,
+            reason: "Confirmed receipt recorded",
+            actorUserId: access.userId,
+          });
         await tx
           .update(s.salesContracts)
           .set({
@@ -625,7 +810,7 @@ export function createLifecycleService(db: SalesDb) {
             updatedByUserId: access.userId,
           })
           .where(eq(s.salesContracts.id, id));
-        await audit(
+        await scopedAudit(
           tx,
           projectId,
           access.userId,
@@ -651,6 +836,7 @@ export function createLifecycleService(db: SalesDb) {
       projectId: string,
       input: unknown,
     ) {
+      assertScope(access, projectId, scopeKey);
       assertSales(access, projectId, "crm.edit");
       assertSales(access, projectId, "deals.view");
       const r = record(input),
@@ -671,12 +857,19 @@ export function createLifecycleService(db: SalesDb) {
       if (budgetMin && budgetMax && cents(budgetMin) > cents(budgetMax))
         throw Error("Budget range is reversed.");
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         const [lead] = await tx
           .select()
           .from(s.salesLeads)
           .where(
             and(
-              eq(s.salesLeads.projectId, projectId),
+              and(
+                eq(s.salesLeads.projectId, projectId),
+                eq(s.salesLeads.scopeKey, scopeKey),
+              ),
               eq(s.salesLeads.id, leadId),
             ),
           )
@@ -693,10 +886,16 @@ export function createLifecycleService(db: SalesDb) {
           .insert(s.salesBuyerProfiles)
           .values({
             projectId,
+            scopeKey,
             leadId,
             budgetMin,
             budgetMax,
             preferredBedrooms,
+            preferredTypes: String(r.preferredTypes ?? "")
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean)
+              .slice(0, 20),
             nextAction: text(r.nextAction, 2000),
             updatedByUserId: access.userId,
           })
@@ -706,13 +905,18 @@ export function createLifecycleService(db: SalesDb) {
               budgetMin,
               budgetMax,
               preferredBedrooms,
+              preferredTypes: String(r.preferredTypes ?? "")
+                .split(",")
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 20),
               nextAction: text(r.nextAction, 2000),
               revision: (old?.revision ?? 0) + 1,
               updatedByUserId: access.userId,
               updatedAt: new Date(),
             },
           });
-        await audit(
+        await scopedAudit(
           tx,
           projectId,
           access.userId,
@@ -725,6 +929,7 @@ export function createLifecycleService(db: SalesDb) {
       });
     },
     async policy(access: PortalAccess, projectId: string, input: unknown) {
+      assertScope(access, projectId, scopeKey);
       assertSales(access, projectId, "settings.edit");
       const r = record(input);
       if (r.automationEnabled === true)
@@ -743,6 +948,10 @@ export function createLifecycleService(db: SalesDb) {
         updatedByUserId: access.userId,
       };
       return db.transaction(async (tx) => {
+        if (scopeKey !== "real")
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${projectId + ":" + scopeKey}))`,
+          );
         await tx
           .select({ id: s.projects.id })
           .from(s.projects)
@@ -750,12 +959,15 @@ export function createLifecycleService(db: SalesDb) {
           .for("update");
         await tx
           .insert(s.salesLifecycleSettings)
-          .values({ projectId, ...values })
+          .values({ projectId, scopeKey, ...values })
           .onConflictDoUpdate({
-            target: s.salesLifecycleSettings.projectId,
+            target: [
+              s.salesLifecycleSettings.projectId,
+              s.salesLifecycleSettings.scopeKey,
+            ],
             set: { ...values, updatedAt: new Date() },
           });
-        await audit(
+        await scopedAudit(
           tx,
           projectId,
           access.userId,

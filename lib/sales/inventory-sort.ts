@@ -13,7 +13,8 @@ export type InventorySortKey =
   | "advertisingPrice"
   | "internalPrice"
   | "contractPrice"
-  | "features";
+  | "features"
+  | "transactionStatus";
 export type InventorySort = {
   key: InventorySortKey;
   direction: "asc" | "desc";
@@ -31,6 +32,7 @@ type Row = {
   landAreaSqm: string | null;
   publicAskingPrice: string | null;
   features: string[];
+  transactionStatus?: string;
 };
 type Price = {
   unitId: string;

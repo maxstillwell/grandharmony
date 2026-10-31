@@ -1,3 +1,5 @@
+import { createPlatformService } from "@/lib/sales/platform-service";
+import { resolveSalesScope } from "@/lib/sales/workspace-scope";
 import { notFound } from "next/navigation";
 import { requirePortalAccess } from "@/lib/auth/guards";
 import { canSales } from "@/lib/sales/permissions";
@@ -16,10 +18,10 @@ export const metadata = { title: "Sales Management | Grand Harmony" };
 export default async function SalesManagement({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string }>;
+  searchParams: Promise<{ project?: string; mode?: string }>;
 }) {
   const access = await requirePortalAccess();
-  const { project: requested } = await searchParams;
+  const { project: requested, mode } = await searchParams;
   const projects = access.projects.filter((p) =>
     canSales(access, p.id, "inventory.view"),
   );
@@ -39,8 +41,18 @@ export default async function SalesManagement({
     );
   }
   let data;
+  let scopeKey = "real";
   try {
-    data = await createSalesService(getSalesDb()).workspace(access, project.id);
+    scopeKey = await resolveSalesScope(
+      getSalesDb(),
+      access,
+      project.id,
+      mode === "demo",
+    );
+    data = await createSalesService(getSalesDb(), scopeKey).workspace(
+      access,
+      project.id,
+    );
   } catch {
     return (
       <main className="portal-page">
@@ -56,9 +68,18 @@ export default async function SalesManagement({
   }
   return (
     <SalesWorkspace
-      key={project.id}
+      key={`${project.id}-${scopeKey}`}
+      demo={scopeKey !== "real"}
+      platform={
+        canSales(access, project.id, "deals.view")
+          ? await createPlatformService(getSalesDb(), scopeKey).workspace(
+              access,
+              project.id,
+            )
+          : undefined
+      }
       data={data}
-      lifecycle={await loadLifecycle(access, project.id)}
+      lifecycle={await loadLifecycle(access, project.id, scopeKey)}
       projectId={project.id}
       projectName={salesProjectName(project)}
       reviewPlan={

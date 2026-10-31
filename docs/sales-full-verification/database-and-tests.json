@@ -1,0 +1,50 @@
+{
+  "neon": {
+    "project": "shiny-tooth-37334133",
+    "branch": "br-royal-firefly-a7acoiq6",
+    "database": "neondb",
+    "migration": "0007_sales_complete",
+    "sha256": "003b10f6625729c6e68ccaeaaedf0601d7fc5cd342c6fdb10ed6a1fc5a5fcae4",
+    "recoveryPoint": {
+      "timestamp": "2026-10-31T14:07:26.834Z",
+      "wal": "0/260CE70",
+      "verifiedRetentionSeconds": 21600
+    },
+    "migrationCount": 8,
+    "constraints": {
+      "new_tables": 8,
+      "scope_integrity_constraints": 8,
+      "active_uniqueness_indexes": 2,
+      "immutable_cash_trigger": 1,
+      "exact_migration_entry": 1
+    },
+    "canonicalDataPreserved": {
+      "inventory_hash": true,
+      "prices_hash": true,
+      "crm_hash": true,
+      "publication_hash": true,
+      "settings_hash": true
+    },
+    "golfview": {
+      "residences": 47,
+      "privateAskingPrices": 47,
+      "unit1Restricted": true,
+      "unexpectedPublicOrReleased": 0,
+      "offers": 0,
+      "reservations": 0,
+      "contracts": 0
+    }
+  },
+  "verification": {
+    "automatedTests": 73,
+    "fullWorkflowBrowser": 11,
+    "originalV3Browser": 7,
+    "originalV2Browser": 10,
+    "originalInventoryBrowser": 9,
+    "lint": "pass",
+    "typecheck": "pass",
+    "productionBuild": "pass",
+    "authenticatedProductionBrowser": "pending: no authorised live session used; no protection bypass or share link created"
+  },
+  "scope": "No genuine customer or financial transactions inserted; screenshots contain isolated synthetic data."
+}

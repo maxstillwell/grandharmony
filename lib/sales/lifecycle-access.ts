@@ -14,6 +14,7 @@ export type LifecycleState = {
 export async function loadLifecycle(
   access: PortalAccess,
   projectId: string,
+  scopeKey = "real",
 ): Promise<LifecycleState> {
   if (!canSales(access, projectId, "deals.view"))
     return {
@@ -25,13 +26,12 @@ export async function loadLifecycle(
     return {
       enabled: false,
       data: null,
-      reason:
-        "Transaction entry is not activated. Owner approval is required before enabling offers, reservations, contracts or receipts.",
+      reason: "Transaction entry is not activated for this project.",
     };
   try {
     return {
       enabled: true,
-      data: await createLifecycleService(getSalesDb()).workspace(
+      data: await createLifecycleService(getSalesDb(), scopeKey).workspace(
         access,
         projectId,
       ),
