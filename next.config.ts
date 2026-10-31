@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // turn bufferutil into a stub and break Neon WebSocket frames in production.
   serverExternalPackages: ["ws", "@neondatabase/serverless"],
   outputFileTracingIncludes: {
+    "/api/portal/projects/[projectId]/sales/media/fixture/[file]": ["./assets/sales-media-test/*.svg"],
     "/api/portal/sales/[projectId]/drawing": [
       "./assets/sales/golfview-review/masterplan.svg",
     ],

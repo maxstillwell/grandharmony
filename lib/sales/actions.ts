@@ -9,6 +9,7 @@ import {
   lifecycleEnabled,
   type TransactionKind,
 } from "./lifecycle-service";
+import {createResidenceMediaService} from "./media-service";
 import { resolveSalesScope } from "./workspace-scope";
 import { createPlatformService } from "./platform-service";
 import { revalidatePath } from "next/cache";
@@ -33,6 +34,7 @@ export async function salesAction(
       projectId,
       row.demo === true,
     );
+    if(operation.startsWith("media.")){const data=await createResidenceMediaService(getSalesDb(),scopeKey).execute(access,projectId,operation.slice(6),row);revalidatePath("/portal/sales");return {ok:true,data:data??true};}
     if (operation.startsWith("platform.")) {
       if (!lifecycleEnabled(projectId))
         return {

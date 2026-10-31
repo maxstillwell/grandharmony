@@ -12,6 +12,8 @@ import { Publishing } from "./publishing";
 import { Settings } from "./settings";
 import { LifecycleWorkspace, LifecyclePolicy } from "./lifecycle";
 import type { LifecycleState } from "@/lib/sales/lifecycle-access";
+import {ResidenceMediaWorkspace} from "./residence-media";
+import type {ResidenceMediaData} from "@/lib/sales/media-service";
 import { PlatformWorkspace } from "./platform";
 import type { PlatformData } from "@/lib/sales/platform-service";
 import { Crm } from "./crm";
@@ -19,12 +21,14 @@ export function SalesWorkspace({
   data,
   demo = false,
   platform,
+  media,initialTab="Overview",initialMediaNumber,
   projectId,
   projectName,
   projects = [],
   reviewPlan,
   lifecycle = { enabled: false, data: null },
 }: {
+  media?:ResidenceMediaData;initialTab?:string;initialMediaNumber?:string;
   platform?: PlatformData;
   demo?: boolean;
   data: Data;
@@ -34,7 +38,7 @@ export function SalesWorkspace({
   reviewPlan?: ManagementPlan;
   lifecycle?: LifecycleState;
 }) {
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState(initialTab);
   const [selectedUnitId, onSelectUnit] = useState<string | null>(null);
   const [openUnitId, setOpenUnitId] = useState<string | null>(null);
   const [transactionFilter, setTransactionFilter] = useState<{
@@ -126,6 +130,7 @@ export function SalesWorkspace({
   const tabs = [
     "Overview",
     "Inventory",
+    ...(media?["Media / Revisions"]:[]),
     ...(!data.agent ? ["Explorer / Map"] : []),
     ...(!demo && data.permissions["inventory.edit"]
       ? ["Pricing / Releases", "Import"]
@@ -274,6 +279,7 @@ export function SalesWorkspace({
             />
           )}
         {tab === "Inventory" && <Inventory {...shared} />}
+        {tab === "Media / Revisions" && media && <ResidenceMediaWorkspace shared={shared} media={media} initialNumber={initialMediaNumber}/>}
         {tab === "Explorer / Map" && <Inventory {...shared} mapOnly />}
         {tab === "Pricing / Releases" && <Stages {...shared} />}
         {tab === "Import" && <Import {...shared} />}

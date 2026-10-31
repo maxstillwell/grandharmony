@@ -156,6 +156,7 @@ export function createPlatformService(db: SalesDb, scopeKey = "real") {
           sql`select pg_advisory_xact_lock(hashtext(${pid + ":" + scopeKey}))`,
         );
         for (const t of [
+          s.salesResidenceMediaCurrent, s.salesResidenceMedia,
           s.salesTaskStates,
           s.salesCashEntries,
           s.salesCommissions,

@@ -1,3 +1,4 @@
+import {createResidenceMediaService} from "@/lib/sales/media-service";
 import { createPlatformService } from "@/lib/sales/platform-service";
 import { resolveSalesScope } from "@/lib/sales/workspace-scope";
 import { notFound } from "next/navigation";
@@ -18,10 +19,10 @@ export const metadata = { title: "Sales Management | Grand Harmony" };
 export default async function SalesManagement({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string; mode?: string }>;
+  searchParams: Promise<{ project?: string; mode?: string; tab?:string; residence?:string }>;
 }) {
   const access = await requirePortalAccess();
-  const { project: requested, mode } = await searchParams;
+  const { project: requested, mode,tab,residence } = await searchParams;
   const projects = access.projects.filter((p) =>
     canSales(access, p.id, "inventory.view"),
   );
@@ -70,6 +71,9 @@ export default async function SalesManagement({
     <SalesWorkspace
       key={`${project.id}-${scopeKey}`}
       demo={scopeKey !== "real"}
+      initialTab={tab==="Media"?"Media / Revisions":undefined}
+      initialMediaNumber={residence}
+      media={canSales(access,project.id,"inventory.edit")?await createResidenceMediaService(getSalesDb(),scopeKey).workspace(access,project.id):undefined}
       platform={
         canSales(access, project.id, "deals.view")
           ? await createPlatformService(getSalesDb(), scopeKey).workspace(

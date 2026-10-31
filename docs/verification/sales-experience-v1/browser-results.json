@@ -1,0 +1,11 @@
+{
+  "tests": [
+    "Real service creates four synthetic demo media versions tied to one canonical residence, no inventory copy",
+    "Before/after browser preview, separate review and approval, and simulated current pointer use actual services",
+    "Restoring older approved ground asset preserves first floor and every real inventory/price byte; demo versions absent from real scope",
+    "Mobile media table, revision preview and decision controls remain operable without document overflow"
+  ],
+  "passed": 4,
+  "pageErrors": [],
+  "environment": "Loopback PGlite fixture, real application components and services; not authenticated Production acceptance"
+}
