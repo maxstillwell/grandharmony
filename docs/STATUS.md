@@ -6,6 +6,8 @@ Sales Management is integrated into main for direct Production deployment. Migra
 
 Buyer enquiries remain disabled and no fictional inventory is published. The owner superseded the earlier staging/draft-PR release workflow.
 
+Production runtime verification found Next's bundled `ws` optional native helper resolving to a stub (`mask is not a function`). The server configuration now externalises `ws` and the Neon driver so Node loads their actual packages; transactional sales services remain intact.
+
 ## Phase 3D — Model Management & Scenario Comparison
 
 ### Completed in source
