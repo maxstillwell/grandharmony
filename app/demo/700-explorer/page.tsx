@@ -25,7 +25,7 @@ const testHotspots: UnitHotspot[] = testUnits.map((unit, index) => {
 });
 export default function PrototypePage() {
   return <main className="mx-auto min-h-screen max-w-7xl space-y-7 bg-[#faf9f6] px-4 py-12 text-[#20201f] sm:px-8">
-    <header><p className="text-xs uppercase tracking-widest">Grand Harmony / Engineering prototype</p><h1 className="mt-2 text-4xl">700 Project — 2D Explorer Test</h1><p className="mt-3 text-sm text-stone-600">Interactive engine proof of concept. This is NOT the actual Vermont South site layout or live inventory. Genuine architect plans and the approved Unit Schedule are still required.</p></header>
+    <header><p className="text-xs uppercase tracking-widest">Grand Harmony / Engineering prototype</p><h1 className="mt-2 text-4xl">Golfview — 2D Explorer Test</h1><p className="mt-3 text-sm text-stone-600">Interactive engine proof of concept. This is NOT the actual Vermont South site layout or live inventory. Genuine architect plans and the approved Unit Schedule are still required.</p></header>
     <SitePlanExplorer demo units={testUnits} hotspots={testHotspots} />
   </main>;
 }
