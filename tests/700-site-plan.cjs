@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
 test("700 explorer is explicitly non-public and all inventory is demo-only", () => {
-  const page = fs.readFileSync("app/demo/700-explorer/page.tsx", "utf8");
+  const page = fs.readFileSync("app/demo/golfview-explorer/page.tsx", "utf8");
   const component = fs.readFileSync("components/sales/site-plan-explorer.tsx", "utf8");
   assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.match(page, /NOT FOR SALES/);
